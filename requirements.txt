@@ -1,0 +1,4 @@
+pyodbc
+psycopg[binary]
+pyyaml
+roskarl
