@@ -1,5 +1,5 @@
 import polars as pl
-from orchestrator.connection import get_mssql_connection
+from config.connection import get_mssql_connection
 
 
 def read_query(source_dns: str, query: str) -> tuple[list[tuple], list[str]]:

@@ -19,16 +19,17 @@ def run_ingest(
     start: Optional[str] = None,
     end: Optional[str] = None,
     verbose: bool = True,
-    **kwargs
+    force: bool = False,
+    **kwargs,
 ) -> dict:
     from orchestrator.write import write, write_polars
     from orchestrator.cron_checker import CronChecker
-    
+
     checker = None
     if schedule:
         checker = CronChecker(model_name=dest_table, schedule=schedule)
-        checker.check_and_start()
-    
+        checker.check_and_start(force=force)
+
     start_total = time.time()
 
     try:
@@ -72,10 +73,10 @@ def run_ingest(
             print(f"  Total: {total_time:.2f}s")
 
         result_dict = {
-            'rows': rows_count,
-            'exec_time': exec_time,
-            'write_time': write_time,
-            'total_time': total_time,
+            "rows": rows_count,
+            "exec_time": exec_time,
+            "write_time": write_time,
+            "total_time": total_time,
         }
 
         if checker:

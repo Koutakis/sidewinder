@@ -1,4 +1,7 @@
 from orchestrator import run_ingest, read_query, TableMode
+import sys
+from pathlib import Path
+
 
 def execute(start=None, end=None):
     query = f"""
@@ -55,12 +58,14 @@ def execute(start=None, end=None):
     """
     return read_query("RAINDANCE_3610", query)
 
+
 run_ingest(
     dest_env="BIG_EKONOMI_EXECUTION_PROD",
     dest_table="hq0x_sandbox.ek_fakta_verifikat",
     execute=execute,
     table_mode=TableMode.INCREMENTAL,
-    schedule='0 6 * * *',
+    schedule="0 6 * * *",
     start="2024-01-01",
-    end="2024-01-31",
+    end="2024-06-30",
+    force=True,
 )
