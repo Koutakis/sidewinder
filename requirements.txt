@@ -1,4 +1,5 @@
 pyodbc
 psycopg[binary]
-pyyaml
+polars
 roskarl
+croniter

@@ -1,6 +1,4 @@
-from orchestrator import run_ingest, read_query, TableMode
-import sys
-from pathlib import Path
+from orchestrator import run_ingest, read, TableMode
 
 
 def execute(start=None, end=None):
@@ -56,7 +54,7 @@ def execute(start=None, end=None):
     ) y
     WHERE _data_modified BETWEEN '{start}' AND '{end}'
     """
-    return read_query("RAINDANCE_3610", query)
+    return read("RAINDANCE_3610", query)
 
 
 run_ingest(

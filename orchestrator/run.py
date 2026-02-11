@@ -13,7 +13,7 @@ class TableMode(Enum):
 def run_ingest(
     dest_env: str,
     dest_table: str,
-    execute: Callable,
+    execute: Callable[..., pl.DataFrame],
     table_mode: TableMode = TableMode.FULL,
     schedule: Optional[str] = None,
     start: Optional[str] = None,
@@ -22,7 +22,7 @@ def run_ingest(
     force: bool = False,
     **kwargs,
 ) -> dict:
-    from orchestrator.write import write, write_polars
+    from orchestrator.write import write
     from orchestrator.cron_checker import CronChecker
 
     checker = None
@@ -38,33 +38,17 @@ def run_ingest(
             print(f"[{datetime.now()}] Executing {dest_table}{date_range}...")
 
         start_exec = time.time()
-        result = execute(start=start, end=end, **kwargs)
+        df = execute(start=start, end=end, **kwargs)
+        rows_count = len(df)
+        exec_time = time.time() - start_exec
 
-        if isinstance(result, pl.DataFrame):
-            df = result
-            rows_count = len(df)
-            exec_time = time.time() - start_exec
+        if verbose:
+            print(f"  ✓ {rows_count:,} rows in {exec_time:.2f}s")
+            print(f"[{datetime.now()}] Writing to {dest_table}...")
 
-            if verbose:
-                print(f"  ✓ {rows_count:,} rows in {exec_time:.2f}s")
-                print(f"[{datetime.now()}] Writing to {dest_table}...")
-
-            start_write = time.time()
-            write_polars(dest_env, dest_table, df, table_mode.value)
-            write_time = time.time() - start_write
-
-        else:
-            rows, columns = result
-            rows_count = len(rows)
-            exec_time = time.time() - start_exec
-
-            if verbose:
-                print(f"  ✓ {rows_count:,} rows in {exec_time:.2f}s")
-                print(f"[{datetime.now()}] Writing to {dest_table}...")
-
-            start_write = time.time()
-            write(dest_env, dest_table, rows, columns, table_mode.value)
-            write_time = time.time() - start_write
+        start_write = time.time()
+        write(dest_env, dest_table, df, table_mode.value)
+        write_time = time.time() - start_write
 
         total_time = time.time() - start_total
 
@@ -72,7 +56,7 @@ def run_ingest(
             print(f"  ✓ Written in {write_time:.2f}s")
             print(f"  Total: {total_time:.2f}s")
 
-        result_dict = {
+        result = {
             "rows": rows_count,
             "exec_time": exec_time,
             "write_time": write_time,
@@ -82,7 +66,7 @@ def run_ingest(
         if checker:
             checker.update_success(rows_count, total_time)
 
-        return result_dict
+        return result
 
     except Exception as e:
         total_time = time.time() - start_total
