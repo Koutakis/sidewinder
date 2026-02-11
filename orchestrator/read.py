@@ -1,18 +1,15 @@
 import polars as pl
-from config.connection import get_mssql_connection
+from config.connections import get_mssql_connection
 
 
 def read_query(source_dns: str, query: str) -> tuple[list[tuple], list[str]]:
     conn = get_mssql_connection(source_dns)
     cursor = conn.cursor()
     cursor.execute(query)
-
     columns = [desc[0] for desc in cursor.description]
     rows = cursor.fetchall()
-
     cursor.close()
     conn.close()
-
     return rows, columns
 
 
