@@ -64,6 +64,6 @@ run_ingest(
     table_mode=TableMode.INCREMENTAL,
     schedule="0 6 * * *",
     start="2024-01-01",
-    end="2024-06-30",
+    end="2026-02-12",
     force=True,
 )
