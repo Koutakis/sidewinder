@@ -137,22 +137,30 @@ def read_and_transform(file_path: str | Path, separator: str = "\t", encoding: s
         pl.col("konto").alias("Konto"),
     )
 
-    non_december = transformed.filter(pl.col("_period_date").dt.month() != 12)
+    # Accumulated: all rows as-is
+    accumulated = transformed.with_columns(pl.lit(True).alias("is_accumulated"))
 
+    # De-accumulated: Ursprung (all 12 months) + Avackumulering (months 1-11 shifted)
+    ursprung = transformed.with_columns(pl.lit(False).alias("is_accumulated"))
+
+    non_december = transformed.filter(pl.col("_period_date").dt.month() != 12)
     shifted_date = pl.col("_period_date").dt.offset_by("1mo")
-    deacc = non_december.with_columns(
+    avack = non_december.with_columns(
         _format_period_us(shifted_date).alias("Period"),
         shifted_date.alias("_period_date"),
         (pl.col("Belopp") * -1).alias("Belopp"),
+        pl.lit(False).alias("is_accumulated"),
     )
 
-    result = pl.concat([non_december, deacc])
+    result = pl.concat([accumulated, ursprung, avack])
 
     return result.drop("_period_date")
+
 
 def one_table_to_rule_them_all(directory: Path) -> pl.DataFrame:
     files = sorted(directory.glob("*.txt"))
     return pl.concat([read_and_transform(f) for f in files])
+
 
 if __name__ == "__main__":
     import sys
