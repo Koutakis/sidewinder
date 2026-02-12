@@ -39,6 +39,7 @@ def write(
 
         if table_mode in ["replace", "fail"]:
             col_defs = [f'"{col}" {pg_type_from_polars(df[col].dtype)}' for col in columns]
+            conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
             conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {schema}.{table} ({', '.join(col_defs)})"
             )
