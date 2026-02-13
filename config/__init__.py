@@ -9,4 +9,4 @@ __all__ = [
     "get_postgres_connection",
     "POLARS_TO_PG",
     "pg_type_from_polars",
-    ]
+]
