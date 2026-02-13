@@ -1,4 +1,4 @@
-from orchestrator import run_ingest, TableMode
+from core import run_ingest, TableMode
 import polars as pl
 from pathlib import Path
 from source.cognos.cognos_transform import read_and_transform
@@ -6,7 +6,7 @@ from source.cognos.cognos_transform import read_and_transform
 
 def execute(start=None, end=None):
     mega_df = pl.DataFrame()
-    for i in [21, 22, 23, 24, 25, 26]:
+    for i in [21, 22, 23, 24, 25, 26, 27, 28]: # years to be included
         df = read_and_transform(
             file_path=Path(f"/home/hq0x/ingest-cronjobs/tmp/Test_Cc_utdata{i}.txt"),
             separator="\t",

@@ -1,7 +1,7 @@
-from orchestrator import run_ingest, read, TableMode
+from core import run_ingest, read, TableMode
 
 
-def execute(start=None, end=None): #
+def execute(start=None, end=None): 
     query=f"""SELECT * FROM (SELECT 
     	CAST(GETDATE() AS DATE) as _data_modified,
     	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
@@ -29,7 +29,7 @@ def execute(start=None, end=None): #
 
 run_ingest(
     dest_env="BIG_EKONOMI_EXECUTION_PROD",
-    dest_table="hq0x_sandbox.ar_fakta_historik", #
+    dest_table="hq0x_sandbox.ar_fakta_historik", 
     execute=execute,
     table_mode=TableMode.FULL,
     schedule="0 6 * * *",
