@@ -1,4 +1,3 @@
-
 from orchestrator import run_ingest, TableMode
 import polars as pl
 from pathlib import Path
@@ -8,9 +7,11 @@ from source.cognos.cognos_transform import read_and_transform
 def execute(start=None, end=None):
     mega_df = pl.DataFrame()
     for i in [21, 22, 23, 24, 25, 26]:
-        df = read_and_transform(file_path = Path(f"/home/hq0x/ingest-cronjobs/tmp/Test_Cc_utdata{i}.txt"),
-                                separator = "\t",
-                                encoding = "utf-8")
+        df = read_and_transform(
+            file_path=Path(f"/home/hq0x/ingest-cronjobs/tmp/Test_Cc_utdata{i}.txt"),
+            separator="\t",
+            encoding="utf-8",
+        )
         mega_df = pl.concat([mega_df, df])
     return mega_df
 
