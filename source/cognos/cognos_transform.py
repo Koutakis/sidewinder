@@ -37,8 +37,19 @@ def _extract_justeringstyp(col: pl.Expr) -> pl.Expr:
 
 
 ANLT_PREFIXES = [
-    "1010", "1013", "1110", "1130", "1150", "1215",
-    "1220", "1240", "1261", "1262", "1264", "1269", "1270",
+    "1010",
+    "1013",
+    "1110",
+    "1130",
+    "1150",
+    "1215",
+    "1220",
+    "1240",
+    "1261",
+    "1262",
+    "1264",
+    "1269",
+    "1270",
 ]
 PANY_PREFIXES = ["1280", "1275"]
 LS_PREFIXES = ["2350", "2390"]
@@ -92,16 +103,18 @@ def _format_period_us(col: pl.Expr) -> pl.Expr:
 
 
 def _clean_columns(df: pl.DataFrame) -> pl.DataFrame:
-    return df.with_columns(
-        pl.col(pl.Utf8).str.strip_chars().replace("", None)
-    )
+    return df.with_columns(pl.col(pl.Utf8).str.strip_chars().replace("", None))
 
 
-def read_and_transform(file_path: str | Path, separator: str = "\t", encoding: str = "utf-8") -> pl.DataFrame:
+def read_and_transform(
+    file_path: str | Path, separator: str = "\t", encoding: str = "utf-8"
+) -> pl.DataFrame:
     path = Path(file_path)
 
     if path.suffix.lower() in (".csv", ".tsv", ".txt"):
-        df = pl.read_csv(path, separator=separator, encoding=encoding, infer_schema_length=0)
+        df = pl.read_csv(
+            path, separator=separator, encoding=encoding, infer_schema_length=0
+        )
     elif path.suffix.lower() == ".parquet":
         df = pl.read_parquet(path)
     elif path.suffix.lower() in (".xlsx", ".xls"):
