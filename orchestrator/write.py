@@ -1,5 +1,4 @@
 import polars as pl
-import psycopg
 from config.connection import get_postgres_connection
 from config.type_mapping import pg_type_from_polars
 
@@ -16,7 +15,9 @@ def _parse_table(dest_table: str) -> tuple[str, str]:
 def _clean_row(row: tuple) -> tuple:
     return tuple(
         None
-        if (isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf")))
+        if (
+            isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf"))
+        )
         else v
         for v in row
     )
@@ -38,7 +39,9 @@ def write(
             conn.commit()
 
         if table_mode in ["replace", "fail"]:
-            col_defs = [f'"{col}" {pg_type_from_polars(df[col].dtype)}' for col in columns]
+            col_defs = [
+                f'"{col}" {pg_type_from_polars(df[col].dtype)}' for col in columns
+            ]
             conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
             conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {schema}.{table} ({', '.join(col_defs)})"
