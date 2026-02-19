@@ -1,75 +1,76 @@
 import time
+import os
 import polars as pl
 from datetime import datetime
-from enum import Enum
-from typing import Callable, Optional
-
-
-class TableMode(Enum):
-    FULL = "replace"
-    INCREMENTAL = "append"
+from typing import Callable
+from core.model import ModelConfig, TableMode
 
 
 def run_ingest(
-    dest_env: str,
-    dest_table: str,
     execute: Callable[..., pl.DataFrame],
-    table_mode: TableMode = TableMode.FULL,
-    schedule: Optional[str] = None,
-    start: Optional[str] = None,
-    end: Optional[str] = None,
+    dest_env: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    table_mode: TableMode | None = None,
     verbose: bool = True,
-    force: bool = False,
     **kwargs,
 ) -> dict:
-    from orchestrator.write import write
-    from orchestrator.cron_checker import CronChecker
+    from core.write import write, create_indexes
 
-    checker = None
-    if schedule:
-        checker = CronChecker(model_name=dest_table, schedule=schedule)
-        checker.check_and_start(force=force)
+    config: ModelConfig = execute._model_config
+
+    dest_env = dest_env or os.environ.get("SIDEWINDER_DEST_ENV")
+    since = since or os.environ.get("SIDEWINDER_SINCE")
+    until = until or os.environ.get("SIDEWINDER_UNTIL")
+    mode = table_mode or TableMode(os.environ.get("SIDEWINDER_TABLE_MODE", config.default_table_mode.value))
+
+    if not dest_env:
+        raise ValueError("dest_env must be provided or set via SIDEWINDER_DEST_ENV")
 
     start_total = time.time()
 
-    try:
-        if verbose:
-            date_range = f" ({start} to {end})" if start and end else ""
-            print(f"[{datetime.now()}] Executing {dest_table}{date_range}...")
+    if verbose:
+        date_range = f" ({since} to {until})" if since and until else ""
+        print(f"[{datetime.now()}] Executing {config.name}{date_range}...")
 
-        start_exec = time.time()
-        df = execute(start=start, end=end, **kwargs)
-        rows_count = len(df)
-        exec_time = time.time() - start_exec
+    start_exec = time.time()
+    df = execute(since=since, until=until, **kwargs)
+    rows_count = len(df)
+    exec_time = time.time() - start_exec
 
-        if verbose:
-            print(f"  ✓ {rows_count:,} rows in {exec_time:.2f}s")
-            print(f"[{datetime.now()}] Writing to {dest_table}...")
+    if verbose:
+        print(f"  ✓ {rows_count:,} rows in {exec_time:.2f}s")
+        print(f"[{datetime.now()}] Writing to {config.destination_schema}.{config.destination_table}...")
 
-        start_write = time.time()
-        write(dest_env, dest_table, df, table_mode.value)
-        write_time = time.time() - start_write
+    start_write = time.time()
+    write(
+        dest_env=dest_env,
+        df=df,
+        schema=config.destination_schema,
+        table=config.destination_table,
+        table_mode=mode.value,
+        ddl=config.destination_ddl,
+        since=since,
+        until=until,
+    )
 
-        total_time = time.time() - start_total
+    create_indexes(
+        dest_env=dest_env,
+        schema=config.destination_schema,
+        table=config.destination_table,
+        indexes=config.destination_indexes,
+    )
 
-        if verbose:
-            print(f"  ✓ Written in {write_time:.2f}s")
-            print(f"  Total: {total_time:.2f}s")
+    write_time = time.time() - start_write
+    total_time = time.time() - start_total
 
-        result = {
-            "rows": rows_count,
-            "exec_time": exec_time,
-            "write_time": write_time,
-            "total_time": total_time,
-        }
+    if verbose:
+        print(f"  ✓ Written in {write_time:.2f}s")
+        print(f"  Total: {total_time:.2f}s")
 
-        if checker:
-            checker.update_success(rows_count, total_time)
-
-        return result
-
-    except Exception as e:
-        total_time = time.time() - start_total
-        if checker:
-            checker.update_failure(str(e), total_time)
-        raise
+    return {
+        "rows": rows_count,
+        "exec_time": exec_time,
+        "write_time": write_time,
+        "total_time": total_time,
+    }
