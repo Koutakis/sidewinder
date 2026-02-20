@@ -31,7 +31,7 @@ def model(
     default_table_mode: TableMode = TableMode.APPEND,
 ) -> Callable:
     config = ModelConfig(
-        na e eme=name,
+        name=name,
         source_table=source_table,
         destination_table=destination_table,
         destination_schema=destination_schema,

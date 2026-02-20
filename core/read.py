@@ -1,5 +1,5 @@
 import polars as pl
-from config.connection import get_mssql_connection
+from config.connections import get_mssql_connection
 
 
 def read(source_dns: str, query: str) -> pl.DataFrame:

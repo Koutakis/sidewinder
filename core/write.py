@@ -38,15 +38,15 @@ def write(
     col_defs = ddl if ddl else _build_ddl_from_df(df)
 
     with conn:
-        if table_mode == "truncate_insert":
-            conn.execute(f"TRUNCATE TABLE IF EXISTS {schema}.{table}")
-            conn.commit()
-
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
         conn.execute(
             f"CREATE TABLE IF NOT EXISTS {schema}.{table} ({col_defs})"
         )
         conn.commit()
+
+        if table_mode == "truncate_insert":
+            conn.execute(f"TRUNCATE TABLE {schema}.{table}")
+            conn.commit()
 
         if table_mode == "merge" and since and until:
             conn.execute(
