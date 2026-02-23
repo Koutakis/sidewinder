@@ -1,10 +1,12 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import polars as pl
 from config.connections import get_postgres_connection
 from config.type_mapping import pg_type_from_polars
 
-
-def _parse_table(dest_table: str, dest_schema: str) -> tuple[str, str]:
-    return dest_schema, dest_table
+if TYPE_CHECKING:
+    from core.model import ResolvedConfig
 
 
 def _clean_row(row: tuple) -> tuple:
@@ -22,36 +24,26 @@ def _build_ddl_from_df(df: pl.DataFrame) -> str:
     )
 
 
-def write(
-    dest_env: str,
-    df: pl.DataFrame,
-    schema: str,
-    table: str,
-    table_mode: str,
-    ddl: str | None = None,
-    since: str | None = None,
-    until: str | None = None,
-) -> None:
-    conn = get_postgres_connection(dest_env)
+def write(cfg: ResolvedConfig, df: pl.DataFrame) -> None:
+    conn = get_postgres_connection(cfg.dest_env)
+    schema = cfg.destination_schema
+    table = cfg.destination_table
     columns = df.columns
-
-    col_defs = ddl if ddl else _build_ddl_from_df(df)
+    col_defs = cfg.destination_ddl if cfg.destination_ddl else _build_ddl_from_df(df)
 
     with conn:
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
-        conn.execute(
-            f"CREATE TABLE IF NOT EXISTS {schema}.{table} ({col_defs})"
-        )
+        conn.execute(f"CREATE TABLE IF NOT EXISTS {schema}.{table} ({col_defs})")
         conn.commit()
 
-        if table_mode == "truncate_insert":
+        if cfg.table_mode.value == "truncate_insert":
             conn.execute(f"TRUNCATE TABLE {schema}.{table}")
             conn.commit()
 
-        if table_mode == "merge" and since and until:
+        if cfg.table_mode.value == "merge" and cfg.since and cfg.until:
             conn.execute(
                 f'DELETE FROM {schema}.{table} WHERE "_data_modified" >= %s AND "_data_modified" < %s',
-                (since, until),
+                (cfg.since, cfg.until),
             )
             conn.commit()
 
@@ -65,21 +57,10 @@ def write(
 
         conn.commit()
 
-
-def create_indexes(
-    dest_env: str,
-    schema: str,
-    table: str,
-    indexes: list[str],
-) -> None:
-    if not indexes:
-        return
-
-    conn = get_postgres_connection(dest_env)
-    with conn:
-        for col in indexes:
-            index_name = f"idx_{table}_{col}"
-            conn.execute(
-                f'CREATE INDEX IF NOT EXISTS {index_name} ON {schema}.{table} ("{col}")'
-            )
-        conn.commit()
+        if cfg.destination_indexes:
+            for col in cfg.destination_indexes:
+                index_name = f"idx_{table}_{col}"
+                conn.execute(
+                    f'CREATE INDEX IF NOT EXISTS {index_name} ON {schema}.{table} ("{col}")'
+                )
+            conn.commit()
