@@ -6,7 +6,7 @@ from config.connections import get_postgres_connection
 from config.type_mapping import pg_type_from_polars
 
 if TYPE_CHECKING:
-    from core.model import ResolvedConfig
+    from core.model import ModelConfig
 
 
 def _clean_row(row: tuple) -> tuple:
@@ -24,7 +24,7 @@ def _build_ddl_from_df(df: pl.DataFrame) -> str:
     )
 
 
-def write(cfg: ResolvedConfig, df: pl.DataFrame) -> None:
+def write(cfg: ModelConfig, df: pl.DataFrame, since: str | None = None, until: str | None = None) -> None:
     conn = get_postgres_connection(cfg.dest_env)
     schema = cfg.destination_schema
     table = cfg.destination_table
@@ -40,10 +40,10 @@ def write(cfg: ResolvedConfig, df: pl.DataFrame) -> None:
             conn.execute(f"TRUNCATE TABLE {schema}.{table}")
             conn.commit()
 
-        if cfg.table_mode.value == "merge" and cfg.since and cfg.until:
+        if cfg.table_mode.value == "merge" and since and until:
             conn.execute(
                 f'DELETE FROM {schema}.{table} WHERE "_data_modified" >= %s AND "_data_modified" < %s',
-                (cfg.since, cfg.until),
+                (since, until),
             )
             conn.commit()
 

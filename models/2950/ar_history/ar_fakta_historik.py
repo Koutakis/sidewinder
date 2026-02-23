@@ -1,16 +1,18 @@
-from core import model, read, TableMode
+from core import ModelConfig, TableMode, read
 
 
-@model(
+config = ModelConfig(
     name="ar_fakta_historik_2950",
     source_table="AR_FAKTA_HISTORIK",
+    source_env="RAINDANCE_2950",
     destination_table="ar_fakta_historik_2950",
     destination_schema="hq0x_sandbox",
     dest_env="BIG_EKONOMI_EXECUTION_PROD",
-    source_env="RAINDANCE_2950",
-    default_table_mode=TableMode.TRUNCATE_INSERT,
+    table_mode=TableMode.TRUNCATE_INSERT,
 )
-def execute(cfg):
+
+
+def execute(env, cfg=config):
     query = """
     SELECT
         CAST(GETDATE() AS DATE) as _data_modified,
@@ -34,6 +36,3 @@ def execute(cfg):
     FROM [utdata].[utdata295].[AR_FAKTA_HISTORIK]
     """
     yield from read(cfg.source_env, query)
-
-
-execute()

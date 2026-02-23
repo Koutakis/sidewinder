@@ -1,11 +1,13 @@
 from .read import read
 from .write import write
-from .model import model, ResolvedConfig, TableMode
+from .run import run
+from .model import ModelConfig, TableMode
 
 __all__ = [
     "read",
     "write",
-    "model",
-    "ResolvedConfig",
+    "run",
+    "ModelConfig",
     "TableMode",
 ]
+
