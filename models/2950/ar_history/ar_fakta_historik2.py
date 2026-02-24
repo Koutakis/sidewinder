@@ -70,4 +70,4 @@ def execute(env, cfg=config):
         [VERNR] AS VERNR
     FROM [utdata].[utdata298].[AR_FAKTA_HISTORIK2]
     """
-    yield from read(env_var_dsn("RAINDANCE_2950"), query)
+    yield from read(env_name="RAINDANCE_2950", query=query)

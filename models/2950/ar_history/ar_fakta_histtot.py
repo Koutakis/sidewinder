@@ -64,4 +64,4 @@ def execute(env, cfg=config):
         [UTR] AS UTR
     FROM [utdata].[utdata295].[AR_FAKTA_HISTTOT]
     """
-    yield from read(env_var_dsn("RAINDANCE_2950"), query)
+    yield from read(env_name="RAINDANCE_2950", query=query)
