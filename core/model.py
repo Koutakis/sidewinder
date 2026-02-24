@@ -3,19 +3,21 @@ from enum import Enum
 
 
 class TableMode(Enum):
-    APPEND = "append"
-    TRUNCATE_INSERT = "truncate_insert"
-    MERGE = "merge"
+    APPEND = "APPEND"
+    TRUNCATE_INSERT = "TRUNCATE_INSERT"
+    MERGE = "MERGE"
 
 
 @dataclass
 class ModelConfig:
     name: str
     source_table: str
-    source_env: str | None = None
     destination_table: str = ""
     destination_schema: str = ""
-    destination_ddl: str | None = None
+ # destination_ddl: str | None = None
+    columns: list[dict]
     destination_indexes: list[str] = field(default_factory=list)
     dest_env: str | None = None
     table_mode: TableMode = TableMode.APPEND
+    tags: list[str]= None
+    enabled: bool = False #Test this

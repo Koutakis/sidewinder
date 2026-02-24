@@ -3,6 +3,7 @@ import importlib
 import os
 from pathlib import Path
 from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var
 from core import run
 from core.logger import print_header, print_model_list, print_summary, print_success, print_failure, exit_with_error
 
@@ -23,9 +24,13 @@ def discover_models() -> dict:
 @with_env_config
 def main(env: EnvConfig):
     available = discover_models()
+    dest_env = env_var("BIG_EKONOMI_EXECUTION_PROD")
 
     if not available:
         exit_with_error("No models found")
+
+    if not dest_env:
+        exit_with_error("DEST_ENV not set")
 
     print_model_list(available)
 
@@ -36,7 +41,7 @@ def main(env: EnvConfig):
         try:
             module = importlib.import_module(import_path)
             print_header(module.config.name)
-            run(module.config, module.execute, env)
+            run(module.config, module.execute, env, dest_env)
             print_success(module.config.name)
             successes += 1
         except Exception as e:

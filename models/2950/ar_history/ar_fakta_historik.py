@@ -1,14 +1,37 @@
-from core import ModelConfig, TableMode, read
+from bollhav import Model, WriteMode
+from core import read
+from roskarl import env_var_dsn
+import polars as pl
 
 
-config = ModelConfig(
+config = Model(
     name="ar_fakta_historik_2950",
     source_table="AR_FAKTA_HISTORIK",
-    source_env="RAINDANCE_2950",
     destination_table="ar_fakta_historik_2950",
     destination_schema="hq0x_sandbox",
-    dest_env="BIG_EKONOMI_EXECUTION_PROD",
-    table_mode=TableMode.TRUNCATE_INSERT,
+    write_mode=WriteMode.TRUNCATE_INSERT,
+    columns={
+        "_data_modified": pl.Date,
+        "_metadata_modified": pl.Datetime,
+        "ANLAGGNING": pl.String,
+        "ANLTYP_ID": pl.String,
+        "ANSK": pl.Float64,
+        "BERAKNBELOPP": pl.Float64,
+        "HANDELSE": pl.String,
+        "KORRTYP": pl.String,
+        "KST_ID": pl.String,
+        "PLAC2_ID": pl.String,
+        "PLAC_ID": pl.String,
+        "PLAVSKR": pl.Float64,
+        "PROJ_ID": pl.String,
+        "REG_DATUM_TID": pl.Datetime,
+        "REGSIGN": pl.String,
+        "UTILITY": pl.String,
+        "VERDATUM": pl.Datetime,
+        "VERNR": pl.Int64,
+    },
+    cron="0 6 * * *",
+    tags=["raindance"],
 )
 
 
@@ -35,4 +58,4 @@ def execute(env, cfg=config):
         [VERNR] AS VERNR
     FROM [utdata].[utdata295].[AR_FAKTA_HISTORIK]
     """
-    yield from read(cfg.source_env, query)
+    yield from read(env_var_dsn("RAINDANCE_2950"), query)

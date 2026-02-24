@@ -1,38 +1,53 @@
-from core.model import ModelConfig, TableMode
+from bollhav import Model, WriteMode
 
 
-def run(cfg: ModelConfig, fn, env) -> None:
+def get_max_date(cfg: Model, dest_env: str) -> str | None:
+    from config.connections import get_postgres_connection
+
+    conn = get_postgres_connection(dest_env)
+    schema = cfg.destination_schema
+    table = cfg.destination_table
+
+    try:
+        with conn:
+            result = conn.execute(
+                f'SELECT MAX("_data_modified")::text FROM {schema}.{table}'
+            ).fetchone()
+        return result[0] if result and result[0] else None
+    except Exception:
+        return None
+
+
+def run(cfg: Model, fn, env, dest_env: str) -> None:
     from core.write import write
-
-    if cfg.table_mode == TableMode.MERGE and not (env.cron or env.backfill):
-        raise ValueError(f"{cfg.name}: MERGE mode requires cron or backfill config")
-
-    if not cfg.dest_env:
-        raise ValueError(f"{cfg.name}: dest_env must be set")
 
     since = None
     until = None
-    if env.cron and env.cron.since:
-        since = str(env.cron.since)
-        until = str(env.cron.until)
-    elif env.backfill and env.backfill.since:
+
+    if env.backfill and env.backfill.since:
         since = str(env.backfill.since)
         until = str(env.backfill.until) if env.backfill.until else None
+    elif env.cron and env.cron.since:
+        since = str(env.cron.since)
+        until = str(env.cron.until)
+
+    if cfg.write_mode == WriteMode.MERGE and not since:
+        since = get_max_date(cfg, dest_env)
 
     total_rows = 0
     first_batch = True
-    original_mode = cfg.table_mode
+    original_mode = cfg.write_mode
 
     for df in fn(env, cfg):
         if len(df) == 0:
             continue
-        write(cfg, df, since=since, until=until)
+        write(cfg, df, dest_env, since=since, until=until)
         if first_batch:
-            cfg.table_mode = TableMode.APPEND
+            cfg.write_mode = WriteMode.APPEND
             first_batch = False
         total_rows += len(df)
 
-    cfg.table_mode = original_mode
+    cfg.write_mode = original_mode
 
     if total_rows == 0:
         print(f"  ⏭ {cfg.name}: no data, skipping")

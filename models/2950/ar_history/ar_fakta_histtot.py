@@ -1,14 +1,40 @@
-from core import ModelConfig, TableMode, read
+from bollhav import Model, WriteMode
+from core import read
+from roskarl import env_var_dsn
+import polars as pl
 
 
-config = ModelConfig(
+config = Model(
     name="ar_fakta_histtot_2950",
     source_table="AR_FAKTA_HISTTOT",
-    source_env="RAINDANCE_2950",
     destination_table="ar_fakta_histtot_2950",
     destination_schema="hq0x_sandbox",
-    dest_env="BIG_EKONOMI_EXECUTION_PROD",
-    table_mode=TableMode.TRUNCATE_INSERT,
+    write_mode=WriteMode.TRUNCATE_INSERT,
+    columns={
+        "_data_modified": pl.Date,
+        "_metadata_modified": pl.Datetime,
+        "ANLTYP_ID": pl.String,
+        "BELOPPSTYP": pl.String,
+        "FLY": pl.Float64,
+        "FORS": pl.Float64,
+        "IB": pl.Float64,
+        "INV": pl.Float64,
+        "KOR": pl.Float64,
+        "KST_ID": pl.String,
+        "OMF": pl.Float64,
+        "PAV": pl.Float64,
+        "PERIOD": pl.Datetime,
+        "PLAC2_ID": pl.String,
+        "PLAC_ID": pl.String,
+        "PROJ_ID": pl.String,
+        "STR": pl.Float64,
+        "UB": pl.Float64,
+        "UTF": pl.Float64,
+        "UTILITY": pl.String,
+        "UTR": pl.Float64,
+    },
+    cron="0 6 * * *",
+    tags=["raindance"],
 )
 
 
@@ -38,4 +64,4 @@ def execute(env, cfg=config):
         [UTR] AS UTR
     FROM [utdata].[utdata295].[AR_FAKTA_HISTTOT]
     """
-    yield from read(cfg.source_env, query)
+    yield from read(env_var_dsn("RAINDANCE_2950"), query)

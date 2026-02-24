@@ -2,4 +2,4 @@ pyodbc
 psycopg[binary]
 polars
 roskarl
-croniter
+bollhav

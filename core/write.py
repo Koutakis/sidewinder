@@ -6,7 +6,7 @@ from config.connections import get_postgres_connection
 from config.type_mapping import pg_type_from_polars
 
 if TYPE_CHECKING:
-    from core.model import ModelConfig
+    from bollhav import Model
 
 
 def _clean_row(row: tuple) -> tuple:
@@ -18,29 +18,35 @@ def _clean_row(row: tuple) -> tuple:
     )
 
 
+def _build_ddl_from_config(columns: dict) -> str:
+    return ", ".join(
+        f'"{name}" {pg_type_from_polars(dtype)}' for name, dtype in columns.items()
+    )
+
+
 def _build_ddl_from_df(df: pl.DataFrame) -> str:
     return ", ".join(
         f'"{col}" {pg_type_from_polars(df[col].dtype)}' for col in df.columns
     )
 
 
-def write(cfg: ModelConfig, df: pl.DataFrame, since: str | None = None, until: str | None = None) -> None:
-    conn = get_postgres_connection(cfg.dest_env)
+def write(cfg: Model, df: pl.DataFrame, dest_env: str, since: str | None = None, until: str | None = None) -> None:
+    conn = get_postgres_connection(dest_env)
     schema = cfg.destination_schema
     table = cfg.destination_table
     columns = df.columns
-    col_defs = cfg.destination_ddl if cfg.destination_ddl else _build_ddl_from_df(df)
+    col_defs = _build_ddl_from_config(cfg.columns) if cfg.columns else _build_ddl_from_df(df)
 
     with conn:
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
         conn.execute(f"CREATE TABLE IF NOT EXISTS {schema}.{table} ({col_defs})")
         conn.commit()
 
-        if cfg.table_mode.value == "truncate_insert":
+        if cfg.write_mode.value == "TRUNCATE_INSERT":
             conn.execute(f"TRUNCATE TABLE {schema}.{table}")
             conn.commit()
 
-        if cfg.table_mode.value == "merge" and since and until:
+        if cfg.write_mode.value == "MERGE" and since and until:
             conn.execute(
                 f'DELETE FROM {schema}.{table} WHERE "_data_modified" >= %s AND "_data_modified" < %s',
                 (since, until),
@@ -57,10 +63,13 @@ def write(cfg: ModelConfig, df: pl.DataFrame, since: str | None = None, until: s
 
         conn.commit()
 
-        if cfg.destination_indexes:
-            for col in cfg.destination_indexes:
-                index_name = f"idx_{table}_{col}"
-                conn.execute(
-                    f'CREATE INDEX IF NOT EXISTS {index_name} ON {schema}.{table} ("{col}")'
-                )
-            conn.commit()
+
+def write_view(cfg: Model, dest_env: str, view_query: str) -> None:
+    conn = get_postgres_connection(dest_env)
+    schema = cfg.destination_schema
+    table = cfg.destination_table
+
+    with conn:
+        conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+        conn.execute(f"CREATE OR REPLACE VIEW {schema}.{table} AS {view_query}")
+        conn.commit()
