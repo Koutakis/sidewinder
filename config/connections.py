@@ -1,11 +1,6 @@
 import pyodbc
 import psycopg
-from roskarl import env_var_dsn, DSN
-
-
-def get_postgres_connection(dsn: DSN) -> psycopg.Connection:
-    conn_string = f"host={dsn.hostname} port={dsn.port} dbname={dsn.database} user={dsn.username} password={dsn.password}"
-    return psycopg.connect(conn_string)
+from roskarl import DSN
 
 
 def get_mssql_connection(dsn: DSN, timeout: int = 600) -> pyodbc.Connection:
@@ -22,4 +17,6 @@ def get_mssql_connection(dsn: DSN, timeout: int = 600) -> pyodbc.Connection:
     return conn
 
 
-
+def get_postgres_connection(dsn: DSN) -> psycopg.Connection:
+    conn_string = f"host={dsn.hostname} port={dsn.port} dbname={dsn.database} user={dsn.username} password={dsn.password}"
+    return psycopg.connect(conn_string)

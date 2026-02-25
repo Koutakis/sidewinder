@@ -1,6 +1,5 @@
 from bollhav import Model, WriteMode
 from core import read
-from roskarl import env_var_dsn
 import polars as pl
 
 

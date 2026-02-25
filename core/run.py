@@ -1,12 +1,13 @@
 from bollhav import Model, WriteMode
+from roskarl import DSN
 
 
-def get_max_date(cfg: Model, dest_env: str) -> str | None:
+def get_max_date(cfg: Model, dest_dsn: DSN) -> str | None:
     from config.connections import get_postgres_connection
 
-    conn = get_postgres_connection(dest_env)
-    schema = cfg.destination_schema
-    table = cfg.destination_table
+    conn = get_postgres_connection(dest_dsn)
+    schema = cfg.schema
+    table = cfg.table
 
     try:
         with conn:
@@ -18,8 +19,11 @@ def get_max_date(cfg: Model, dest_env: str) -> str | None:
         return None
 
 
-def run(cfg: Model, fn, env, dest_env: str) -> None:
+def run(cfg: Model, fn, env, dest_dsn: DSN) -> None:
     from core.write import write
+
+    if not dest_dsn:
+        raise ValueError(f"{cfg.name}: dest_dsn must be set")
 
     since = None
     until = None
@@ -32,7 +36,7 @@ def run(cfg: Model, fn, env, dest_env: str) -> None:
         until = str(env.cron.until)
 
     if cfg.write_mode == WriteMode.MERGE and not since:
-        since = get_max_date(cfg, dest_env)
+        since = get_max_date(cfg, dest_dsn)
 
     total_rows = 0
     first_batch = True
@@ -41,7 +45,7 @@ def run(cfg: Model, fn, env, dest_env: str) -> None:
     for df in fn(env, cfg):
         if len(df) == 0:
             continue
-        write(cfg, df, dest_env, since=since, until=until)
+        write(cfg, df, dest_dsn, since=since, until=until)
         if first_batch:
             cfg.write_mode = WriteMode.APPEND
             first_batch = False
