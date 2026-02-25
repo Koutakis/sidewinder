@@ -28,12 +28,12 @@ def run(cfg: Model, fn, env, dest_dsn: DSN) -> None:
     since = None
     until = None
 
-    if env.backfill and env.backfill.since:
-        since = str(env.backfill.since)
-        until = str(env.backfill.until) if env.backfill.until else None
-    elif env.cron and env.cron.since:
-        since = str(env.cron.since)
-        until = str(env.cron.until)
+    if env.backfill and env.backfill.enabled:
+        since = env.backfill.since.strftime("%Y-%m-%d")
+        until = env.backfill.until.strftime("%Y-%m-%d")
+    elif env.cron and env.cron.enabled:
+        since = env.cron.since.strftime("%Y-%m-%d")
+        until = env.cron.until.strftime("%Y-%m-%d")
 
     if cfg.write_mode == WriteMode.MERGE and not since:
         since = get_max_date(cfg, dest_dsn)
