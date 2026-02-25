@@ -4,8 +4,8 @@ from config.connections import get_mssql_connection
 from roskarl import env_var_dsn
 
 
-def read(env_name: str, query: str, batch_size: int | None = None) -> Generator[pl.DataFrame, None, None]:
-    dsn = env_var_dsn(name=env_name)
+def read(env_var_name: str, query: str, batch_size: int | None = None) -> Generator[pl.DataFrame, None, None]:
+    dsn = env_var_dsn(name=env_var_name)
     conn = get_mssql_connection(dsn)
 
     if batch_size is None:
