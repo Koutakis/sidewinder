@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ar_dim_beloppstyp",
@@ -24,16 +26,30 @@ config = Model(
     tags=['lis', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[BELOPPSTYP] AS BELOPPSTYP,
-    	[BELOPPSTYP2_ID_TEXT] AS BELOPPSTYP2_ID_TEXT,
-    	[BELOPPSTYP2_TEXT] AS BELOPPSTYP2_TEXT,
-    	[BELOPPSTYP_ID_TEXT] AS BELOPPSTYP_ID_TEXT,
-    	[BELOPPSTYP_ORDNING] AS BELOPPSTYP_ORDNING,
-    	[BELOPPSTYP_TEXT] AS BELOPPSTYP_TEXT
-    FROM [utdata].[utdata840].[AR_DIM_BELOPPSTYP]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_8410')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[BELOPPSTYP] AS BELOPPSTYP,
+	[BELOPPSTYP2_ID_TEXT] AS BELOPPSTYP2_ID_TEXT,
+	[BELOPPSTYP2_TEXT] AS BELOPPSTYP2_TEXT,
+	[BELOPPSTYP_ID_TEXT] AS BELOPPSTYP_ID_TEXT,
+	[BELOPPSTYP_ORDNING] AS BELOPPSTYP_ORDNING,
+	[BELOPPSTYP_TEXT] AS BELOPPSTYP_TEXT
+    FROM [utdata].[utdata840].[AR_DIM_BELOPPSTYP]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8410", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="rk_dim_lev_attr",
@@ -21,13 +23,27 @@ config = Model(
     tags=['kultn', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[ATTR_KEY_PAT] AS ATTR_KEY_PAT,
-    	[ATTRIBUTE] AS ATTRIBUTE,
-    	[SBID] AS SBID
-    FROM [utdata].[utdata361].[RK_DIM_LEV_ATTR]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_3610')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[ATTR_KEY_PAT] AS ATTR_KEY_PAT,
+	[ATTRIBUTE] AS ATTRIBUTE,
+	[SBID] AS SBID
+    FROM [utdata].[utdata361].[RK_DIM_LEV_ATTR]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_3610", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

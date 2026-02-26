@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_fakta_verifikat",
@@ -78,7 +80,9 @@ config = Model(
     tags=['ste', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
     if env.backfill and env.backfill.enabled:
         since = env.backfill.since.strftime("%Y-%m-%d")
         until = env.backfill.until.strftime("%Y-%m-%d")
@@ -86,71 +90,82 @@ def execute(env, cfg=config):
         since = env.cron.since.strftime("%Y-%m-%d")
         until = env.cron.until.strftime("%Y-%m-%d")
     else:
-        since = None
-        until = None
-    query=f"""SELECT * FROM (SELECT
-    	CAST(VERDATUM AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[ANTAL_V] AS ANTAL_V,
-    	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
-    	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
-    	[ATTESTSIGN1] AS ATTESTSIGN1,
-    	[ATTESTSIGN2] AS ATTESTSIGN2,
-    	[AVTAL_ID] AS AVTAL_ID,
-    	[BESTUT_V] AS BESTUT_V,
-    	[BUDGET_V] AS BUDGET_V,
-    	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
-    	[DEFSIGN] AS DEFSIGN,
-    	[DOK_ANTAL] AS DOK_ANTAL,
-    	[DOKTYP] AS DOKTYP,
-    	[DOKUMENTID] AS DOKUMENTID,
-    	[EXTERNANM] AS EXTERNANM,
-    	[EXTERNID] AS EXTERNID,
-    	[EXTERNNR] AS EXTERNNR,
-    	[FORETAG] AS FORETAG,
-    	[FÖPRO2_ID] AS FÖPRO2_ID,
-    	[FÖPROC_ID] AS FÖPROC_ID,
-    	[FÖRBEL_V] AS FÖRBEL_V,
-    	[HDATUM_ID] AS HDATUM_ID,
-    	[HUVUDTEXT] AS HUVUDTEXT,
-    	[IB] AS IB,
-    	[INTERNVERNR] AS INTERNVERNR,
-    	[KATEGORI] AS KATEGORI,
-    	[KONTO_ID] AS KONTO_ID,
-    	[KONTSIGN] AS KONTSIGN,
-    	[KST_ID] AS KST_ID,
-    	[KVANT_V] AS KVANT_V,
-    	[MED] AS MED,
-    	[MOTP_ID] AS MOTP_ID,
-    	[OKI_ID] AS OKI_ID,
-    	[OTYP_ID] AS OTYP_ID,
-    	[PGNR_ID] AS PGNR_ID,
-    	[PNYCKEL] AS PNYCKEL,
-    	[POÄNG_V] AS POÄNG_V,
-    	[PROJ_ID] AS PROJ_ID,
-    	[RAD_ID] AS RAD_ID,
-    	[RADTEXT] AS RADTEXT,
-    	[RADTYPNR] AS RADTYPNR,
-    	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
-    	[REGSIGN] AS REGSIGN,
-    	[SKI_ID] AS SKI_ID,
-    	[STATUS] AS STATUS,
-    	[STYP_ID] AS STYP_ID,
-    	[TYP_ID] AS TYP_ID,
-    	[UPPKOD_ID] AS UPPKOD_ID,
-    	[URSPR_ID] AS URSPR_ID,
-    	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
-    	[URSPTEXT] AS URSPTEXT,
-    	[UTFALL_V] AS UTFALL_V,
-    	[UTILITY] AS UTILITY,
-    	[VALUTA_ID] AS VALUTA_ID,
-    	[VALUTA_V] AS VALUTA_V,
-    	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
-    	[VERDOKREF] AS VERDOKREF,
-    	[VERNR] AS VERNR,
-    	[VERRAD] AS VERRAD,
-    	[VERTYP] AS VERTYP,
-    	[YRKGR_ID] AS YRKGR_ID
-    FROM [steudp].[udp_600].[EK_FAKTA_VERIFIKAT]) y
-    WHERE _data_modified BETWEEN '{since}' AND '{until}'"""
-    yield from read(query=query, env_var_name='RAINDANCE_8530')
+        raise ValueError(f"{cfg.name}: MERGE requires CRON or BACKFILL env vars")
+    query = f"""
+    SELECT
+	CAST(VERDATUM AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[ANTAL_V] AS ANTAL_V,
+	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
+	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
+	[ATTESTSIGN1] AS ATTESTSIGN1,
+	[ATTESTSIGN2] AS ATTESTSIGN2,
+	[AVTAL_ID] AS AVTAL_ID,
+	[BESTUT_V] AS BESTUT_V,
+	[BUDGET_V] AS BUDGET_V,
+	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
+	[DEFSIGN] AS DEFSIGN,
+	[DOK_ANTAL] AS DOK_ANTAL,
+	[DOKTYP] AS DOKTYP,
+	[DOKUMENTID] AS DOKUMENTID,
+	[EXTERNANM] AS EXTERNANM,
+	[EXTERNID] AS EXTERNID,
+	[EXTERNNR] AS EXTERNNR,
+	[FORETAG] AS FORETAG,
+	[FÖPRO2_ID] AS FÖPRO2_ID,
+	[FÖPROC_ID] AS FÖPROC_ID,
+	[FÖRBEL_V] AS FÖRBEL_V,
+	[HDATUM_ID] AS HDATUM_ID,
+	[HUVUDTEXT] AS HUVUDTEXT,
+	[IB] AS IB,
+	[INTERNVERNR] AS INTERNVERNR,
+	[KATEGORI] AS KATEGORI,
+	[KONTO_ID] AS KONTO_ID,
+	[KONTSIGN] AS KONTSIGN,
+	[KST_ID] AS KST_ID,
+	[KVANT_V] AS KVANT_V,
+	[MED] AS MED,
+	[MOTP_ID] AS MOTP_ID,
+	[OKI_ID] AS OKI_ID,
+	[OTYP_ID] AS OTYP_ID,
+	[PGNR_ID] AS PGNR_ID,
+	[PNYCKEL] AS PNYCKEL,
+	[POÄNG_V] AS POÄNG_V,
+	[PROJ_ID] AS PROJ_ID,
+	[RAD_ID] AS RAD_ID,
+	[RADTEXT] AS RADTEXT,
+	[RADTYPNR] AS RADTYPNR,
+	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
+	[REGSIGN] AS REGSIGN,
+	[SKI_ID] AS SKI_ID,
+	[STATUS] AS STATUS,
+	[STYP_ID] AS STYP_ID,
+	[TYP_ID] AS TYP_ID,
+	[UPPKOD_ID] AS UPPKOD_ID,
+	[URSPR_ID] AS URSPR_ID,
+	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
+	[URSPTEXT] AS URSPTEXT,
+	[UTFALL_V] AS UTFALL_V,
+	[UTILITY] AS UTILITY,
+	[VALUTA_ID] AS VALUTA_ID,
+	[VALUTA_V] AS VALUTA_V,
+	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
+	[VERDOKREF] AS VERDOKREF,
+	[VERNR] AS VERNR,
+	[VERRAD] AS VERRAD,
+	[VERTYP] AS VERTYP,
+	[YRKGR_ID] AS YRKGR_ID
+    FROM [steudp].[udp_600].[EK_FAKTA_VERIFIKAT]
+    WHERE CAST(VERDATUM AS DATE) BETWEEN '{since}' AND '{until}'
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8530", query, batch_size=500_000):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn, since=since, until=until)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

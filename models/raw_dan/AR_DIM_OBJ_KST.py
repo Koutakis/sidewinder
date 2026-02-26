@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ar_dim_obj_kst",
@@ -54,46 +56,60 @@ config = Model(
     tags=['dan', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	COALESCE([KST_GILTIG_FOM], '1899-12-31 00:00:00') AS KST_GILTIG_FOM,
-    	COALESCE([KST_GILTIG_TOM], '1899-12-31 00:00:00') AS KST_GILTIG_TOM,
-    	[KST_ID] AS KST_ID,
-    	[KST_ID_TEXT] AS KST_ID_TEXT,
-    	[KST_PASSIV] AS KST_PASSIV,
-    	[KST_TEXT] AS KST_TEXT,
-    	COALESCE([SEKT_GILTIG_FOM], '1899-12-31 00:00:00') AS SEKT_GILTIG_FOM,
-    	COALESCE([SEKT_GILTIG_TOM], '1899-12-31 00:00:00') AS SEKT_GILTIG_TOM,
-    	[SEKT_ID] AS SEKT_ID,
-    	[SEKT_ID_TEXT] AS SEKT_ID_TEXT,
-    	[SEKT_PASSIV] AS SEKT_PASSIV,
-    	[SEKT_TEXT] AS SEKT_TEXT,
-    	COALESCE([V_GILTIG_FOM], '1899-12-31 00:00:00') AS V_GILTIG_FOM,
-    	COALESCE([V_GILTIG_TOM], '1899-12-31 00:00:00') AS V_GILTIG_TOM,
-    	[V_ID] AS V_ID,
-    	[V_ID_TEXT] AS V_ID_TEXT,
-    	[V_PASSIV] AS V_PASSIV,
-    	[V_TEXT] AS V_TEXT,
-    	COALESCE([VERK_GILTIG_FOM], '1899-12-31 00:00:00') AS VERK_GILTIG_FOM,
-    	COALESCE([VERK_GILTIG_TOM], '1899-12-31 00:00:00') AS VERK_GILTIG_TOM,
-    	[VERK_ID] AS VERK_ID,
-    	[VERK_ID_TEXT] AS VERK_ID_TEXT,
-    	[VERK_PASSIV] AS VERK_PASSIV,
-    	[VERK_TEXT] AS VERK_TEXT,
-    	COALESCE([VGREN_GILTIG_FOM], '1899-12-31 00:00:00') AS VGREN_GILTIG_FOM,
-    	COALESCE([VGREN_GILTIG_TOM], '1899-12-31 00:00:00') AS VGREN_GILTIG_TOM,
-    	[VGREN_ID] AS VGREN_ID,
-    	[VGREN_ID_TEXT] AS VGREN_ID_TEXT,
-    	[VGREN_PASSIV] AS VGREN_PASSIV,
-    	[VGREN_TEXT] AS VGREN_TEXT,
-    	COALESCE([VO_GILTIG_FOM], '1899-12-31 00:00:00') AS VO_GILTIG_FOM,
-    	COALESCE([VO_GILTIG_TOM], '1899-12-31 00:00:00') AS VO_GILTIG_TOM,
-    	[VO_ID] AS VO_ID,
-    	[VO_ID_TEXT] AS VO_ID_TEXT,
-    	[VO_PASSIV] AS VO_PASSIV,
-    	[VO_TEXT] AS VO_TEXT
-    FROM [raindance_udp].[udp_150].[AR_DIM_OBJ_KST]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_8510')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	COALESCE([KST_GILTIG_FOM], '1899-12-31 00:00:00') AS KST_GILTIG_FOM,
+	COALESCE([KST_GILTIG_TOM], '1899-12-31 00:00:00') AS KST_GILTIG_TOM,
+	[KST_ID] AS KST_ID,
+	[KST_ID_TEXT] AS KST_ID_TEXT,
+	[KST_PASSIV] AS KST_PASSIV,
+	[KST_TEXT] AS KST_TEXT,
+	COALESCE([SEKT_GILTIG_FOM], '1899-12-31 00:00:00') AS SEKT_GILTIG_FOM,
+	COALESCE([SEKT_GILTIG_TOM], '1899-12-31 00:00:00') AS SEKT_GILTIG_TOM,
+	[SEKT_ID] AS SEKT_ID,
+	[SEKT_ID_TEXT] AS SEKT_ID_TEXT,
+	[SEKT_PASSIV] AS SEKT_PASSIV,
+	[SEKT_TEXT] AS SEKT_TEXT,
+	COALESCE([V_GILTIG_FOM], '1899-12-31 00:00:00') AS V_GILTIG_FOM,
+	COALESCE([V_GILTIG_TOM], '1899-12-31 00:00:00') AS V_GILTIG_TOM,
+	[V_ID] AS V_ID,
+	[V_ID_TEXT] AS V_ID_TEXT,
+	[V_PASSIV] AS V_PASSIV,
+	[V_TEXT] AS V_TEXT,
+	COALESCE([VERK_GILTIG_FOM], '1899-12-31 00:00:00') AS VERK_GILTIG_FOM,
+	COALESCE([VERK_GILTIG_TOM], '1899-12-31 00:00:00') AS VERK_GILTIG_TOM,
+	[VERK_ID] AS VERK_ID,
+	[VERK_ID_TEXT] AS VERK_ID_TEXT,
+	[VERK_PASSIV] AS VERK_PASSIV,
+	[VERK_TEXT] AS VERK_TEXT,
+	COALESCE([VGREN_GILTIG_FOM], '1899-12-31 00:00:00') AS VGREN_GILTIG_FOM,
+	COALESCE([VGREN_GILTIG_TOM], '1899-12-31 00:00:00') AS VGREN_GILTIG_TOM,
+	[VGREN_ID] AS VGREN_ID,
+	[VGREN_ID_TEXT] AS VGREN_ID_TEXT,
+	[VGREN_PASSIV] AS VGREN_PASSIV,
+	[VGREN_TEXT] AS VGREN_TEXT,
+	COALESCE([VO_GILTIG_FOM], '1899-12-31 00:00:00') AS VO_GILTIG_FOM,
+	COALESCE([VO_GILTIG_TOM], '1899-12-31 00:00:00') AS VO_GILTIG_TOM,
+	[VO_ID] AS VO_ID,
+	[VO_ID_TEXT] AS VO_ID_TEXT,
+	[VO_PASSIV] AS VO_PASSIV,
+	[VO_TEXT] AS VO_TEXT
+    FROM [raindance_udp].[udp_150].[AR_DIM_OBJ_KST]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8510", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

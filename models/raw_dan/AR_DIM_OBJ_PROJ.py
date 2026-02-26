@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ar_dim_obj_proj",
@@ -36,28 +38,42 @@ config = Model(
     tags=['dan', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	COALESCE([PROJ_GILTIG_FOM], '1899-12-31 00:00:00') AS PROJ_GILTIG_FOM,
-    	COALESCE([PROJ_GILTIG_TOM], '1899-12-31 00:00:00') AS PROJ_GILTIG_TOM,
-    	[PROJ_ID] AS PROJ_ID,
-    	[PROJ_ID_TEXT] AS PROJ_ID_TEXT,
-    	[PROJ_PASSIV] AS PROJ_PASSIV,
-    	[PROJ_TEXT] AS PROJ_TEXT,
-    	COALESCE([PROJA_GILTIG_FOM], '1899-12-31 00:00:00') AS PROJA_GILTIG_FOM,
-    	COALESCE([PROJA_GILTIG_TOM], '1899-12-31 00:00:00') AS PROJA_GILTIG_TOM,
-    	[PROJA_ID] AS PROJA_ID,
-    	[PROJA_ID_TEXT] AS PROJA_ID_TEXT,
-    	[PROJA_PASSIV] AS PROJA_PASSIV,
-    	[PROJA_TEXT] AS PROJA_TEXT,
-    	COALESCE([PROJT_GILTIG_FOM], '1899-12-31 00:00:00') AS PROJT_GILTIG_FOM,
-    	COALESCE([PROJT_GILTIG_TOM], '1899-12-31 00:00:00') AS PROJT_GILTIG_TOM,
-    	[PROJT_ID] AS PROJT_ID,
-    	[PROJT_ID_TEXT] AS PROJT_ID_TEXT,
-    	[PROJT_PASSIV] AS PROJT_PASSIV,
-    	[PROJT_TEXT] AS PROJT_TEXT
-    FROM [raindance_udp].[udp_150].[AR_DIM_OBJ_PROJ]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_8510')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	COALESCE([PROJ_GILTIG_FOM], '1899-12-31 00:00:00') AS PROJ_GILTIG_FOM,
+	COALESCE([PROJ_GILTIG_TOM], '1899-12-31 00:00:00') AS PROJ_GILTIG_TOM,
+	[PROJ_ID] AS PROJ_ID,
+	[PROJ_ID_TEXT] AS PROJ_ID_TEXT,
+	[PROJ_PASSIV] AS PROJ_PASSIV,
+	[PROJ_TEXT] AS PROJ_TEXT,
+	COALESCE([PROJA_GILTIG_FOM], '1899-12-31 00:00:00') AS PROJA_GILTIG_FOM,
+	COALESCE([PROJA_GILTIG_TOM], '1899-12-31 00:00:00') AS PROJA_GILTIG_TOM,
+	[PROJA_ID] AS PROJA_ID,
+	[PROJA_ID_TEXT] AS PROJA_ID_TEXT,
+	[PROJA_PASSIV] AS PROJA_PASSIV,
+	[PROJA_TEXT] AS PROJA_TEXT,
+	COALESCE([PROJT_GILTIG_FOM], '1899-12-31 00:00:00') AS PROJT_GILTIG_FOM,
+	COALESCE([PROJT_GILTIG_TOM], '1899-12-31 00:00:00') AS PROJT_GILTIG_TOM,
+	[PROJT_ID] AS PROJT_ID,
+	[PROJT_ID_TEXT] AS PROJT_ID_TEXT,
+	[PROJT_PASSIV] AS PROJT_PASSIV,
+	[PROJT_TEXT] AS PROJT_TEXT
+    FROM [raindance_udp].[udp_150].[AR_DIM_OBJ_PROJ]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8510", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

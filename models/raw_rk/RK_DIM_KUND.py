@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="rk_dim_kund",
@@ -59,51 +61,65 @@ config = Model(
     tags=['rk', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[ADR1] AS ADR1,
-    	[ADR2] AS ADR2,
-    	[ATTRIBUTE_ACTORID] AS ATTRIBUTE_ACTORID,
-    	[ATTRIBUTE_EAN] AS ATTRIBUTE_EAN,
-    	[BETSPARR] AS BETSPARR,
-    	[BGNR] AS BGNR,
-    	[DUMMY1] AS DUMMY1,
-    	[ELEKTRONISK_KOMMUNIKATION] AS ELEKTRONISK_KOMMUNIKATION,
-    	[ENGANG] AS ENGANG,
-    	[FRI1] AS FRI1,
-    	[FRI2] AS FRI2,
-    	[FRI3] AS FRI3,
-    	[FRI4] AS FRI4,
-    	[GRUPP] AS GRUPP,
-    	[KREDITLIMIT] AS KREDITLIMIT,
-    	[KUND_EREF] AS KUND_EREF,
-    	[KUND_TAB_BETV] AS KUND_TAB_BETV,
-    	[KUND_TAB_MOMS] AS KUND_TAB_MOMS,
-    	[KUND_TAB_MOTP] AS KUND_TAB_MOTP,
-    	[KUND_VREF] AS KUND_VREF,
-    	[KUNDID] AS KUNDID,
-    	[KUNDID2] AS KUNDID2,
-    	[KUNDID_ID_TEXT] AS KUNDID_ID_TEXT,
-    	[KUNDID_TEXT] AS KUNDID_TEXT,
-    	[LAND] AS LAND,
-    	[MOMSREG] AS MOMSREG,
-    	[MSG_INVOIC_FORMAT] AS MSG_INVOIC_FORMAT,
-    	[MSG_INVOIC_PA] AS MSG_INVOIC_PA,
-    	[MSG_INVOIC_TRANSPORT] AS MSG_INVOIC_TRANSPORT,
-    	[MSG_INVOIC_VAG] AS MSG_INVOIC_VAG,
-    	[NAMN2] AS NAMN2,
-    	[OMSATTNING] AS OMSATTNING,
-    	[OMSATTNING_FG] AS OMSATTNING_FG,
-    	COALESCE([OMSATTNINGSAR], '1899-12-31 00:00:00') AS OMSATTNINGSAR,
-    	[ORGNR] AS ORGNR,
-    	[ORT] AS ORT,
-    	[PASSIV] AS PASSIV,
-    	[PGNR] AS PGNR,
-    	[SALDO] AS SALDO,
-    	[SOKBEGR] AS SOKBEGR,
-    	[TELNR] AS TELNR
-    FROM [utdata].[utdata292].[RK_DIM_KUND]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_2920')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[ADR1] AS ADR1,
+	[ADR2] AS ADR2,
+	[ATTRIBUTE_ACTORID] AS ATTRIBUTE_ACTORID,
+	[ATTRIBUTE_EAN] AS ATTRIBUTE_EAN,
+	[BETSPARR] AS BETSPARR,
+	[BGNR] AS BGNR,
+	[DUMMY1] AS DUMMY1,
+	[ELEKTRONISK_KOMMUNIKATION] AS ELEKTRONISK_KOMMUNIKATION,
+	[ENGANG] AS ENGANG,
+	[FRI1] AS FRI1,
+	[FRI2] AS FRI2,
+	[FRI3] AS FRI3,
+	[FRI4] AS FRI4,
+	[GRUPP] AS GRUPP,
+	[KREDITLIMIT] AS KREDITLIMIT,
+	[KUND_EREF] AS KUND_EREF,
+	[KUND_TAB_BETV] AS KUND_TAB_BETV,
+	[KUND_TAB_MOMS] AS KUND_TAB_MOMS,
+	[KUND_TAB_MOTP] AS KUND_TAB_MOTP,
+	[KUND_VREF] AS KUND_VREF,
+	[KUNDID] AS KUNDID,
+	[KUNDID2] AS KUNDID2,
+	[KUNDID_ID_TEXT] AS KUNDID_ID_TEXT,
+	[KUNDID_TEXT] AS KUNDID_TEXT,
+	[LAND] AS LAND,
+	[MOMSREG] AS MOMSREG,
+	[MSG_INVOIC_FORMAT] AS MSG_INVOIC_FORMAT,
+	[MSG_INVOIC_PA] AS MSG_INVOIC_PA,
+	[MSG_INVOIC_TRANSPORT] AS MSG_INVOIC_TRANSPORT,
+	[MSG_INVOIC_VAG] AS MSG_INVOIC_VAG,
+	[NAMN2] AS NAMN2,
+	[OMSATTNING] AS OMSATTNING,
+	[OMSATTNING_FG] AS OMSATTNING_FG,
+	COALESCE([OMSATTNINGSAR], '1899-12-31 00:00:00') AS OMSATTNINGSAR,
+	[ORGNR] AS ORGNR,
+	[ORT] AS ORT,
+	[PASSIV] AS PASSIV,
+	[PGNR] AS PGNR,
+	[SALDO] AS SALDO,
+	[SOKBEGR] AS SOKBEGR,
+	[TELNR] AS TELNR
+    FROM [utdata].[utdata292].[RK_DIM_KUND]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_2920", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

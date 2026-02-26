@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="rk_fakta_levfakt_verifikat",
@@ -91,7 +93,9 @@ config = Model(
     tags=['lis', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
     if env.backfill and env.backfill.enabled:
         since = env.backfill.since.strftime("%Y-%m-%d")
         until = env.backfill.until.strftime("%Y-%m-%d")
@@ -99,84 +103,95 @@ def execute(env, cfg=config):
         since = env.cron.since.strftime("%Y-%m-%d")
         until = env.cron.until.strftime("%Y-%m-%d")
     else:
-        since = None
-        until = None
-    query=f"""SELECT * FROM (SELECT
-    	CAST(VERDATUM AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[ATTEST] AS ATTEST,
-    	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
-    	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
-    	[ATTESTSIGN1] AS ATTESTSIGN1,
-    	[ATTESTSIGN2] AS ATTESTSIGN2,
-    	[AVTALID] AS AVTALID,
-    	[BELOPP_SEK] AS BELOPP_SEK,
-    	[BELOPP_VAL] AS BELOPP_VAL,
-    	[BETALNINGSSPARR] AS BETALNINGSSPARR,
-    	[BETALT_SEK] AS BETALT_SEK,
-    	[BETALT_VAL] AS BETALT_VAL,
-    	[BETDAGAR] AS BETDAGAR,
-    	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
-    	[DEFSIGN] AS DEFSIGN,
-    	[DOK_ANTAL] AS DOK_ANTAL,
-    	[DOKTYP] AS DOKTYP,
-    	[DOKUMENTID] AS DOKUMENTID,
-    	[EREF] AS EREF,
-    	[EXTERNANM] AS EXTERNANM,
-    	[EXTERNID] AS EXTERNID,
-    	[EXTERNNR] AS EXTERNNR,
-    	[F_DOK_ANTAL] AS F_DOK_ANTAL,
-    	[F_MED] AS F_MED,
-    	[FAKTSTATUS] AS FAKTSTATUS,
-    	COALESCE([FAKTURA_REGDATUM], '1899-12-31 00:00:00') AS FAKTURA_REGDATUM,
-    	COALESCE([FAKTURADATUM], '1899-12-31 00:00:00') AS FAKTURADATUM,
-    	[FORETAG] AS FORETAG,
-    	COALESCE([FORFALLODATUM], '1899-12-31 00:00:00') AS FORFALLODATUM,
-    	[FRI_ID] AS FRI_ID,
-    	[HUVUDTEXT] AS HUVUDTEXT,
-    	[IB] AS IB,
-    	[INTERNVERNR] AS INTERNVERNR,
-    	[KATEGORI] AS KATEGORI,
-    	[KONTSIGN] AS KONTSIGN,
-    	[KRAVNIVA] AS KRAVNIVA,
-    	[KST_ID] AS KST_ID,
-    	[KTO_ID] AS KTO_ID,
-    	[LEVID] AS LEVID,
-    	[LEVRTYP] AS LEVRTYP,
-    	[MED] AS MED,
-    	[MOMS_SEK] AS MOMS_SEK,
-    	[MOMS_VAL] AS MOMS_VAL,
-    	[MOTP_ID] AS MOTP_ID,
-    	COALESCE([MOTTATTDAT], '1899-12-31 00:00:00') AS MOTTATTDAT,
-    	[MOTTATTSIGN] AS MOTTATTSIGN,
-    	[NR] AS NR,
-    	[OCRNR] AS OCRNR,
-    	[OVERDRDAGAR] AS OVERDRDAGAR,
-    	[PNYCKEL] AS PNYCKEL,
-    	[PROJ_ID] AS PROJ_ID,
-    	[RADTEXT] AS RADTEXT,
-    	[RADTYPNR] AS RADTYPNR,
-    	[RANTEDEB] AS RANTEDEB,
-    	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
-    	[REGSIGN] AS REGSIGN,
-    	COALESCE([SENASTBETDATUM], '1899-12-31 00:00:00') AS SENASTBETDATUM,
-    	[STATUS] AS STATUS,
-    	[TAB_BETV] AS TAB_BETV,
-    	[TAB_MOTP] AS TAB_MOTP,
-    	[TAB_UBF] AS TAB_UBF,
-    	[TAB_VALUTA] AS TAB_VALUTA,
-    	[URS_ID] AS URS_ID,
-    	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
-    	[URSPTEXT] AS URSPTEXT,
-    	[UTF_V] AS UTF_V,
-    	[UTILITY] AS UTILITY,
-    	COALESCE([UTSKRDATUM], '1899-12-31 00:00:00') AS UTSKRDATUM,
-    	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
-    	[VERDOKREF] AS VERDOKREF,
-    	[VERNR] AS VERNR,
-    	[VERRAD] AS VERRAD,
-    	[VERTYP] AS VERTYP,
-    	[VREF] AS VREF
-    FROM [utdata].[utdata840].[RK_FAKTA_LEVFAKT_VERIFIKAT]) y
-    WHERE _data_modified BETWEEN '{since}' AND '{until}'"""
-    yield from read(query=query, env_var_name='RAINDANCE_8410')
+        raise ValueError(f"{cfg.name}: MERGE requires CRON or BACKFILL env vars")
+    query = f"""
+    SELECT
+	CAST(VERDATUM AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[ATTEST] AS ATTEST,
+	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
+	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
+	[ATTESTSIGN1] AS ATTESTSIGN1,
+	[ATTESTSIGN2] AS ATTESTSIGN2,
+	[AVTALID] AS AVTALID,
+	[BELOPP_SEK] AS BELOPP_SEK,
+	[BELOPP_VAL] AS BELOPP_VAL,
+	[BETALNINGSSPARR] AS BETALNINGSSPARR,
+	[BETALT_SEK] AS BETALT_SEK,
+	[BETALT_VAL] AS BETALT_VAL,
+	[BETDAGAR] AS BETDAGAR,
+	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
+	[DEFSIGN] AS DEFSIGN,
+	[DOK_ANTAL] AS DOK_ANTAL,
+	[DOKTYP] AS DOKTYP,
+	[DOKUMENTID] AS DOKUMENTID,
+	[EREF] AS EREF,
+	[EXTERNANM] AS EXTERNANM,
+	[EXTERNID] AS EXTERNID,
+	[EXTERNNR] AS EXTERNNR,
+	[F_DOK_ANTAL] AS F_DOK_ANTAL,
+	[F_MED] AS F_MED,
+	[FAKTSTATUS] AS FAKTSTATUS,
+	COALESCE([FAKTURA_REGDATUM], '1899-12-31 00:00:00') AS FAKTURA_REGDATUM,
+	COALESCE([FAKTURADATUM], '1899-12-31 00:00:00') AS FAKTURADATUM,
+	[FORETAG] AS FORETAG,
+	COALESCE([FORFALLODATUM], '1899-12-31 00:00:00') AS FORFALLODATUM,
+	[FRI_ID] AS FRI_ID,
+	[HUVUDTEXT] AS HUVUDTEXT,
+	[IB] AS IB,
+	[INTERNVERNR] AS INTERNVERNR,
+	[KATEGORI] AS KATEGORI,
+	[KONTSIGN] AS KONTSIGN,
+	[KRAVNIVA] AS KRAVNIVA,
+	[KST_ID] AS KST_ID,
+	[KTO_ID] AS KTO_ID,
+	[LEVID] AS LEVID,
+	[LEVRTYP] AS LEVRTYP,
+	[MED] AS MED,
+	[MOMS_SEK] AS MOMS_SEK,
+	[MOMS_VAL] AS MOMS_VAL,
+	[MOTP_ID] AS MOTP_ID,
+	COALESCE([MOTTATTDAT], '1899-12-31 00:00:00') AS MOTTATTDAT,
+	[MOTTATTSIGN] AS MOTTATTSIGN,
+	[NR] AS NR,
+	[OCRNR] AS OCRNR,
+	[OVERDRDAGAR] AS OVERDRDAGAR,
+	[PNYCKEL] AS PNYCKEL,
+	[PROJ_ID] AS PROJ_ID,
+	[RADTEXT] AS RADTEXT,
+	[RADTYPNR] AS RADTYPNR,
+	[RANTEDEB] AS RANTEDEB,
+	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
+	[REGSIGN] AS REGSIGN,
+	COALESCE([SENASTBETDATUM], '1899-12-31 00:00:00') AS SENASTBETDATUM,
+	[STATUS] AS STATUS,
+	[TAB_BETV] AS TAB_BETV,
+	[TAB_MOTP] AS TAB_MOTP,
+	[TAB_UBF] AS TAB_UBF,
+	[TAB_VALUTA] AS TAB_VALUTA,
+	[URS_ID] AS URS_ID,
+	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
+	[URSPTEXT] AS URSPTEXT,
+	[UTF_V] AS UTF_V,
+	[UTILITY] AS UTILITY,
+	COALESCE([UTSKRDATUM], '1899-12-31 00:00:00') AS UTSKRDATUM,
+	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
+	[VERDOKREF] AS VERDOKREF,
+	[VERNR] AS VERNR,
+	[VERRAD] AS VERRAD,
+	[VERTYP] AS VERTYP,
+	[VREF] AS VREF
+    FROM [utdata].[utdata840].[RK_FAKTA_LEVFAKT_VERIFIKAT]
+    WHERE CAST(VERDATUM AS DATE) BETWEEN '{since}' AND '{until}'
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8410", query, batch_size=500_000):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn, since=since, until=until)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

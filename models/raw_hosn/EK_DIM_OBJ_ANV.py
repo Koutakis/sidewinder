@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_dim_obj_anv",
@@ -36,28 +38,42 @@ config = Model(
     tags=['hosn', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	COALESCE([ANV_GILTIG_FOM], '1899-12-31 00:00:00') AS ANV_GILTIG_FOM,
-    	COALESCE([ANV_GILTIG_TOM], '1899-12-31 00:00:00') AS ANV_GILTIG_TOM,
-    	[ANV_ID] AS ANV_ID,
-    	[ANV_ID_TEXT] AS ANV_ID_TEXT,
-    	[ANV_PASSIV] AS ANV_PASSIV,
-    	[ANV_TEXT] AS ANV_TEXT,
-    	COALESCE([FAC_GILTIG_FOM], '1899-12-31 00:00:00') AS FAC_GILTIG_FOM,
-    	COALESCE([FAC_GILTIG_TOM], '1899-12-31 00:00:00') AS FAC_GILTIG_TOM,
-    	[FAC_ID] AS FAC_ID,
-    	[FAC_ID_TEXT] AS FAC_ID_TEXT,
-    	[FAC_PASSIV] AS FAC_PASSIV,
-    	[FAC_TEXT] AS FAC_TEXT,
-    	COALESCE([GRUPP_GILTIG_FOM], '1899-12-31 00:00:00') AS GRUPP_GILTIG_FOM,
-    	COALESCE([GRUPP_GILTIG_TOM], '1899-12-31 00:00:00') AS GRUPP_GILTIG_TOM,
-    	[GRUPP_ID] AS GRUPP_ID,
-    	[GRUPP_ID_TEXT] AS GRUPP_ID_TEXT,
-    	[GRUPP_PASSIV] AS GRUPP_PASSIV,
-    	[GRUPP_TEXT] AS GRUPP_TEXT
-    FROM [utdata].[utdata150].[EK_DIM_OBJ_ANV]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_1500')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	COALESCE([ANV_GILTIG_FOM], '1899-12-31 00:00:00') AS ANV_GILTIG_FOM,
+	COALESCE([ANV_GILTIG_TOM], '1899-12-31 00:00:00') AS ANV_GILTIG_TOM,
+	[ANV_ID] AS ANV_ID,
+	[ANV_ID_TEXT] AS ANV_ID_TEXT,
+	[ANV_PASSIV] AS ANV_PASSIV,
+	[ANV_TEXT] AS ANV_TEXT,
+	COALESCE([FAC_GILTIG_FOM], '1899-12-31 00:00:00') AS FAC_GILTIG_FOM,
+	COALESCE([FAC_GILTIG_TOM], '1899-12-31 00:00:00') AS FAC_GILTIG_TOM,
+	[FAC_ID] AS FAC_ID,
+	[FAC_ID_TEXT] AS FAC_ID_TEXT,
+	[FAC_PASSIV] AS FAC_PASSIV,
+	[FAC_TEXT] AS FAC_TEXT,
+	COALESCE([GRUPP_GILTIG_FOM], '1899-12-31 00:00:00') AS GRUPP_GILTIG_FOM,
+	COALESCE([GRUPP_GILTIG_TOM], '1899-12-31 00:00:00') AS GRUPP_GILTIG_TOM,
+	[GRUPP_ID] AS GRUPP_ID,
+	[GRUPP_ID_TEXT] AS GRUPP_ID_TEXT,
+	[GRUPP_PASSIV] AS GRUPP_PASSIV,
+	[GRUPP_TEXT] AS GRUPP_TEXT
+    FROM [utdata].[utdata150].[EK_DIM_OBJ_ANV]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_1500", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

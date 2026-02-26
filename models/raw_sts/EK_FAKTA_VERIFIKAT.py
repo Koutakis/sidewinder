@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_fakta_verifikat",
@@ -69,7 +71,9 @@ config = Model(
     tags=['sts', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
     if env.backfill and env.backfill.enabled:
         since = env.backfill.since.strftime("%Y-%m-%d")
         until = env.backfill.until.strftime("%Y-%m-%d")
@@ -77,62 +81,73 @@ def execute(env, cfg=config):
         since = env.cron.since.strftime("%Y-%m-%d")
         until = env.cron.until.strftime("%Y-%m-%d")
     else:
-        since = None
-        until = None
-    query=f"""SELECT * FROM (SELECT
-    	CAST(VERDATUM AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[ANTAL_V] AS ANTAL_V,
-    	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
-    	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
-    	[ATTESTSIGN1] AS ATTESTSIGN1,
-    	[ATTESTSIGN2] AS ATTESTSIGN2,
-    	[AVTAL_ID] AS AVTAL_ID,
-    	[BUDGET_V] AS BUDGET_V,
-    	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
-    	[DEFSIGN] AS DEFSIGN,
-    	[DOK_ANTAL] AS DOK_ANTAL,
-    	[DOKTYP] AS DOKTYP,
-    	[DOKUMENTID] AS DOKUMENTID,
-    	[DRG_ID] AS DRG_ID,
-    	[EXTERNANM] AS EXTERNANM,
-    	[EXTERNID] AS EXTERNID,
-    	[EXTERNNR] AS EXTERNNR,
-    	[FORETAG] AS FORETAG,
-    	[HUVUDTEXT] AS HUVUDTEXT,
-    	[IB] AS IB,
-    	[INTERNVERNR] AS INTERNVERNR,
-    	[KATEGORI] AS KATEGORI,
-    	[KONTO_ID] AS KONTO_ID,
-    	[KONTSIGN] AS KONTSIGN,
-    	[KST_ID] AS KST_ID,
-    	[LEVID_ID] AS LEVID_ID,
-    	[MED] AS MED,
-    	[MOTP_ID] AS MOTP_ID,
-    	[ORGVAL_V] AS ORGVAL_V,
-    	[PNYCKEL] AS PNYCKEL,
-    	[PRG_V] AS PRG_V,
-    	[PROD_ID] AS PROD_ID,
-    	[PROJ_ID] AS PROJ_ID,
-    	[RADTEXT] AS RADTEXT,
-    	[RADTYPNR] AS RADTYPNR,
-    	[RAMBUD_V] AS RAMBUD_V,
-    	[REGDAT_ID] AS REGDAT_ID,
-    	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
-    	[REGSIGN] AS REGSIGN,
-    	[STATUS] AS STATUS,
-    	[URSP_ID] AS URSP_ID,
-    	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
-    	[URSPTEXT] AS URSPTEXT,
-    	[UTFALL_V] AS UTFALL_V,
-    	[UTILITY] AS UTILITY,
-    	[VAL_ID] AS VAL_ID,
-    	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
-    	[VERDOKREF] AS VERDOKREF,
-    	[VERNR] AS VERNR,
-    	[VERRAD] AS VERRAD,
-    	[VERTYP] AS VERTYP,
-    	[YGRP_ID] AS YGRP_ID
-    FROM [stsudp].[udp_858].[EK_FAKTA_VERIFIKAT]) y
-    WHERE _data_modified BETWEEN '{since}' AND '{until}'"""
-    yield from read(query=query, env_var_name='RAINDANCE_8580')
+        raise ValueError(f"{cfg.name}: MERGE requires CRON or BACKFILL env vars")
+    query = f"""
+    SELECT
+	CAST(VERDATUM AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[ANTAL_V] AS ANTAL_V,
+	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
+	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
+	[ATTESTSIGN1] AS ATTESTSIGN1,
+	[ATTESTSIGN2] AS ATTESTSIGN2,
+	[AVTAL_ID] AS AVTAL_ID,
+	[BUDGET_V] AS BUDGET_V,
+	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
+	[DEFSIGN] AS DEFSIGN,
+	[DOK_ANTAL] AS DOK_ANTAL,
+	[DOKTYP] AS DOKTYP,
+	[DOKUMENTID] AS DOKUMENTID,
+	[DRG_ID] AS DRG_ID,
+	[EXTERNANM] AS EXTERNANM,
+	[EXTERNID] AS EXTERNID,
+	[EXTERNNR] AS EXTERNNR,
+	[FORETAG] AS FORETAG,
+	[HUVUDTEXT] AS HUVUDTEXT,
+	[IB] AS IB,
+	[INTERNVERNR] AS INTERNVERNR,
+	[KATEGORI] AS KATEGORI,
+	[KONTO_ID] AS KONTO_ID,
+	[KONTSIGN] AS KONTSIGN,
+	[KST_ID] AS KST_ID,
+	[LEVID_ID] AS LEVID_ID,
+	[MED] AS MED,
+	[MOTP_ID] AS MOTP_ID,
+	[ORGVAL_V] AS ORGVAL_V,
+	[PNYCKEL] AS PNYCKEL,
+	[PRG_V] AS PRG_V,
+	[PROD_ID] AS PROD_ID,
+	[PROJ_ID] AS PROJ_ID,
+	[RADTEXT] AS RADTEXT,
+	[RADTYPNR] AS RADTYPNR,
+	[RAMBUD_V] AS RAMBUD_V,
+	[REGDAT_ID] AS REGDAT_ID,
+	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
+	[REGSIGN] AS REGSIGN,
+	[STATUS] AS STATUS,
+	[URSP_ID] AS URSP_ID,
+	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
+	[URSPTEXT] AS URSPTEXT,
+	[UTFALL_V] AS UTFALL_V,
+	[UTILITY] AS UTILITY,
+	[VAL_ID] AS VAL_ID,
+	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
+	[VERDOKREF] AS VERDOKREF,
+	[VERNR] AS VERNR,
+	[VERRAD] AS VERRAD,
+	[VERTYP] AS VERTYP,
+	[YGRP_ID] AS YGRP_ID
+    FROM [stsudp].[udp_858].[EK_FAKTA_VERIFIKAT]
+    WHERE CAST(VERDATUM AS DATE) BETWEEN '{since}' AND '{until}'
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8580", query, batch_size=500_000):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn, since=since, until=until)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

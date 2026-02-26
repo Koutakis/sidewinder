@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_dim_period",
@@ -47,39 +49,53 @@ config = Model(
     tags=['vksn', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[AR] AS AR,
-    	[AR_TEXT] AS AR_TEXT,
-    	COALESCE([BOKFORINGSAR], '1899-12-31 00:00:00') AS BOKFORINGSAR,
-    	[BOKFORINGSAR_TEXT] AS BOKFORINGSAR_TEXT,
-    	COALESCE([BOKFORINGSARSLUT], '1899-12-31 00:00:00') AS BOKFORINGSARSLUT,
-    	[KVARTAL] AS KVARTAL,
-    	[KVARTAL_TEXT] AS KVARTAL_TEXT,
-    	[KVARTALNR] AS KVARTALNR,
-    	[KVARTALNR_TEXT] AS KVARTALNR_TEXT,
-    	[MANAD] AS MANAD,
-    	[MANAD_TEXT] AS MANAD_TEXT,
-    	[MANADNR] AS MANADNR,
-    	[MANADNR_TEXT] AS MANADNR_TEXT,
-    	[MANADSNAMN] AS MANADSNAMN,
-    	COALESCE([PERIOD], '1899-12-31 00:00:00') AS PERIOD,
-    	[PERIOD10_TEXT] AS PERIOD10_TEXT,
-    	[PERIOD4_TEXT] AS PERIOD4_TEXT,
-    	[PERIOD6_TEXT] AS PERIOD6_TEXT,
-    	[PERIOD6B_TEXT] AS PERIOD6B_TEXT,
-    	[PERIOD7_TEXT] AS PERIOD7_TEXT,
-    	[PERIOD8_TEXT] AS PERIOD8_TEXT,
-    	[PERIOD_TEXT] AS PERIOD_TEXT,
-    	COALESCE([PERIODSLUT], '1899-12-31 00:00:00') AS PERIODSLUT,
-    	[PERIODSTATUS] AS PERIODSTATUS,
-    	[PERIODSTATUS_TEXT] AS PERIODSTATUS_TEXT,
-    	[TERTIAL] AS TERTIAL,
-    	[TERTIAL_TEXT] AS TERTIAL_TEXT,
-    	[TERTIALNR] AS TERTIALNR,
-    	[TERTIALNR_TEXT] AS TERTIALNR_TEXT
-    FROM [utdata].[utdata155].[EK_DIM_PERIOD]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_1550')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[AR] AS AR,
+	[AR_TEXT] AS AR_TEXT,
+	COALESCE([BOKFORINGSAR], '1899-12-31 00:00:00') AS BOKFORINGSAR,
+	[BOKFORINGSAR_TEXT] AS BOKFORINGSAR_TEXT,
+	COALESCE([BOKFORINGSARSLUT], '1899-12-31 00:00:00') AS BOKFORINGSARSLUT,
+	[KVARTAL] AS KVARTAL,
+	[KVARTAL_TEXT] AS KVARTAL_TEXT,
+	[KVARTALNR] AS KVARTALNR,
+	[KVARTALNR_TEXT] AS KVARTALNR_TEXT,
+	[MANAD] AS MANAD,
+	[MANAD_TEXT] AS MANAD_TEXT,
+	[MANADNR] AS MANADNR,
+	[MANADNR_TEXT] AS MANADNR_TEXT,
+	[MANADSNAMN] AS MANADSNAMN,
+	COALESCE([PERIOD], '1899-12-31 00:00:00') AS PERIOD,
+	[PERIOD10_TEXT] AS PERIOD10_TEXT,
+	[PERIOD4_TEXT] AS PERIOD4_TEXT,
+	[PERIOD6_TEXT] AS PERIOD6_TEXT,
+	[PERIOD6B_TEXT] AS PERIOD6B_TEXT,
+	[PERIOD7_TEXT] AS PERIOD7_TEXT,
+	[PERIOD8_TEXT] AS PERIOD8_TEXT,
+	[PERIOD_TEXT] AS PERIOD_TEXT,
+	COALESCE([PERIODSLUT], '1899-12-31 00:00:00') AS PERIODSLUT,
+	[PERIODSTATUS] AS PERIODSTATUS,
+	[PERIODSTATUS_TEXT] AS PERIODSTATUS_TEXT,
+	[TERTIAL] AS TERTIAL,
+	[TERTIAL_TEXT] AS TERTIAL_TEXT,
+	[TERTIALNR] AS TERTIALNR,
+	[TERTIALNR_TEXT] AS TERTIALNR_TEXT
+    FROM [utdata].[utdata155].[EK_DIM_PERIOD]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_1550", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

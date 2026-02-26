@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_dim_defdatum",
@@ -61,53 +63,67 @@ config = Model(
     tags=['sos', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[AR] AS AR,
-    	[AR_TEXT] AS AR_TEXT,
-    	COALESCE([BOKFORINGSAR], '1899-12-31 00:00:00') AS BOKFORINGSAR,
-    	[BOKFORINGSAR_TEXT] AS BOKFORINGSAR_TEXT,
-    	COALESCE([BOKFORINGSARSLUT], '1899-12-31 00:00:00') AS BOKFORINGSARSLUT,
-    	[DAG] AS DAG,
-    	[DAG_TEXT] AS DAG_TEXT,
-    	[DATUM6_TEXT] AS DATUM6_TEXT,
-    	[DATUM6B_TEXT] AS DATUM6B_TEXT,
-    	[DATUM8_TEXT] AS DATUM8_TEXT,
-    	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
-    	[DEFDATUM_TEXT] AS DEFDATUM_TEXT,
-    	[KVARTAL] AS KVARTAL,
-    	[KVARTAL_TEXT] AS KVARTAL_TEXT,
-    	[KVARTALNR] AS KVARTALNR,
-    	[KVARTALNR_TEXT] AS KVARTALNR_TEXT,
-    	[MANAD] AS MANAD,
-    	[MANAD_TEXT] AS MANAD_TEXT,
-    	[MANADNR] AS MANADNR,
-    	[MANADNR_TEXT] AS MANADNR_TEXT,
-    	[MANADSNAMN] AS MANADSNAMN,
-    	COALESCE([PERIOD], '1899-12-31 00:00:00') AS PERIOD,
-    	[PERIOD10_TEXT] AS PERIOD10_TEXT,
-    	[PERIOD4_TEXT] AS PERIOD4_TEXT,
-    	[PERIOD6_TEXT] AS PERIOD6_TEXT,
-    	[PERIOD6B_TEXT] AS PERIOD6B_TEXT,
-    	[PERIOD7_TEXT] AS PERIOD7_TEXT,
-    	[PERIOD8_TEXT] AS PERIOD8_TEXT,
-    	[PERIOD_TEXT] AS PERIOD_TEXT,
-    	COALESCE([PERIODSLUT], '1899-12-31 00:00:00') AS PERIODSLUT,
-    	[PERIODSTATUS] AS PERIODSTATUS,
-    	[PERIODSTATUS_TEXT] AS PERIODSTATUS_TEXT,
-    	[TERTIAL] AS TERTIAL,
-    	[TERTIAL_TEXT] AS TERTIAL_TEXT,
-    	[TERTIALNR] AS TERTIALNR,
-    	[TERTIALNR_TEXT] AS TERTIALNR_TEXT,
-    	[VECKA] AS VECKA,
-    	[VECKA_TEXT] AS VECKA_TEXT,
-    	[VECKO_TEXT] AS VECKO_TEXT,
-    	[VECKODAG] AS VECKODAG,
-    	[VECKODAG_TEXT] AS VECKODAG_TEXT,
-    	[VECKONR] AS VECKONR,
-    	[VECKONR_TEXT] AS VECKONR_TEXT
-    FROM [raindance_udp].[udp_220].[EK_DIM_DEFDATUM]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_8570')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[AR] AS AR,
+	[AR_TEXT] AS AR_TEXT,
+	COALESCE([BOKFORINGSAR], '1899-12-31 00:00:00') AS BOKFORINGSAR,
+	[BOKFORINGSAR_TEXT] AS BOKFORINGSAR_TEXT,
+	COALESCE([BOKFORINGSARSLUT], '1899-12-31 00:00:00') AS BOKFORINGSARSLUT,
+	[DAG] AS DAG,
+	[DAG_TEXT] AS DAG_TEXT,
+	[DATUM6_TEXT] AS DATUM6_TEXT,
+	[DATUM6B_TEXT] AS DATUM6B_TEXT,
+	[DATUM8_TEXT] AS DATUM8_TEXT,
+	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
+	[DEFDATUM_TEXT] AS DEFDATUM_TEXT,
+	[KVARTAL] AS KVARTAL,
+	[KVARTAL_TEXT] AS KVARTAL_TEXT,
+	[KVARTALNR] AS KVARTALNR,
+	[KVARTALNR_TEXT] AS KVARTALNR_TEXT,
+	[MANAD] AS MANAD,
+	[MANAD_TEXT] AS MANAD_TEXT,
+	[MANADNR] AS MANADNR,
+	[MANADNR_TEXT] AS MANADNR_TEXT,
+	[MANADSNAMN] AS MANADSNAMN,
+	COALESCE([PERIOD], '1899-12-31 00:00:00') AS PERIOD,
+	[PERIOD10_TEXT] AS PERIOD10_TEXT,
+	[PERIOD4_TEXT] AS PERIOD4_TEXT,
+	[PERIOD6_TEXT] AS PERIOD6_TEXT,
+	[PERIOD6B_TEXT] AS PERIOD6B_TEXT,
+	[PERIOD7_TEXT] AS PERIOD7_TEXT,
+	[PERIOD8_TEXT] AS PERIOD8_TEXT,
+	[PERIOD_TEXT] AS PERIOD_TEXT,
+	COALESCE([PERIODSLUT], '1899-12-31 00:00:00') AS PERIODSLUT,
+	[PERIODSTATUS] AS PERIODSTATUS,
+	[PERIODSTATUS_TEXT] AS PERIODSTATUS_TEXT,
+	[TERTIAL] AS TERTIAL,
+	[TERTIAL_TEXT] AS TERTIAL_TEXT,
+	[TERTIALNR] AS TERTIALNR,
+	[TERTIALNR_TEXT] AS TERTIALNR_TEXT,
+	[VECKA] AS VECKA,
+	[VECKA_TEXT] AS VECKA_TEXT,
+	[VECKO_TEXT] AS VECKO_TEXT,
+	[VECKODAG] AS VECKODAG,
+	[VECKODAG_TEXT] AS VECKODAG_TEXT,
+	[VECKONR] AS VECKONR,
+	[VECKONR_TEXT] AS VECKONR_TEXT
+    FROM [raindance_udp].[udp_220].[EK_DIM_DEFDATUM]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8570", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_fakta_verifikat",
@@ -76,7 +78,9 @@ config = Model(
     tags=['slso', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
     if env.backfill and env.backfill.enabled:
         since = env.backfill.since.strftime("%Y-%m-%d")
         until = env.backfill.until.strftime("%Y-%m-%d")
@@ -84,69 +88,80 @@ def execute(env, cfg=config):
         since = env.cron.since.strftime("%Y-%m-%d")
         until = env.cron.until.strftime("%Y-%m-%d")
     else:
-        since = None
-        until = None
-    query=f"""SELECT * FROM (SELECT
-    	CAST(VERDATUM AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	[AKT_ID] AS AKT_ID,
-    	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
-    	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
-    	[ATTESTSIGN1] AS ATTESTSIGN1,
-    	[ATTESTSIGN2] AS ATTESTSIGN2,
-    	[AVT_ID] AS AVT_ID,
-    	[BESTUT_V] AS BESTUT_V,
-    	[BUDGET_V] AS BUDGET_V,
-    	[BUDV2_V] AS BUDV2_V,
-    	[DATUM_ID] AS DATUM_ID,
-    	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
-    	[DEFSIGN] AS DEFSIGN,
-    	[DOK_ANTAL] AS DOK_ANTAL,
-    	[DOKTYP] AS DOKTYP,
-    	[DOKUMENTID] AS DOKUMENTID,
-    	[ERS_ID] AS ERS_ID,
-    	[EXTERNANM] AS EXTERNANM,
-    	[EXTERNID] AS EXTERNID,
-    	[EXTERNNR] AS EXTERNNR,
-    	[FORETAG] AS FORETAG,
-    	[FÖPROC_ID] AS FÖPROC_ID,
-    	[FÖRBEL_V] AS FÖRBEL_V,
-    	[HUVUDTEXT] AS HUVUDTEXT,
-    	[HÄND_ID] AS HÄND_ID,
-    	[IB] AS IB,
-    	[IMOT_ID] AS IMOT_ID,
-    	[INTERNVERNR] AS INTERNVERNR,
-    	[KASSA_ID] AS KASSA_ID,
-    	[KATEGORI] AS KATEGORI,
-    	[KONTO_ID] AS KONTO_ID,
-    	[KONTSIGN] AS KONTSIGN,
-    	[KST_ID] AS KST_ID,
-    	[MED] AS MED,
-    	[MOTP_ID] AS MOTP_ID,
-    	[ORGVAL_V] AS ORGVAL_V,
-    	[PNYCKEL] AS PNYCKEL,
-    	[PROG_V] AS PROG_V,
-    	[PROR12_V] AS PROR12_V,
-    	[RADTEXT] AS RADTEXT,
-    	[RADTYPNR] AS RADTYPNR,
-    	[REGDAT_ID] AS REGDAT_ID,
-    	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
-    	[REGSIGN] AS REGSIGN,
-    	[SID_ID] AS SID_ID,
-    	[STATUS] AS STATUS,
-    	[TRID_ID] AS TRID_ID,
-    	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
-    	[URSPTEXT] AS URSPTEXT,
-    	[UTFALL_V] AS UTFALL_V,
-    	[UTFUTL_V] AS UTFUTL_V,
-    	[UTILITY] AS UTILITY,
-    	[VAL_ID] AS VAL_ID,
-    	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
-    	[VERDOKREF] AS VERDOKREF,
-    	[VERNR] AS VERNR,
-    	[VERRAD] AS VERRAD,
-    	[VERTYP] AS VERTYP,
-    	[YRK_ID] AS YRK_ID
-    FROM [udpb4].[udpb4_100].[EK_FAKTA_VERIFIKAT]) y
-    WHERE _data_modified BETWEEN '{since}' AND '{until}'"""
-    yield from read(query=query, env_var_name='RAINDANCE_1100')
+        raise ValueError(f"{cfg.name}: MERGE requires CRON or BACKFILL env vars")
+    query = f"""
+    SELECT
+	CAST(VERDATUM AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	[AKT_ID] AS AKT_ID,
+	COALESCE([ATTESTDATUM1], '1899-12-31 00:00:00') AS ATTESTDATUM1,
+	COALESCE([ATTESTDATUM2], '1899-12-31 00:00:00') AS ATTESTDATUM2,
+	[ATTESTSIGN1] AS ATTESTSIGN1,
+	[ATTESTSIGN2] AS ATTESTSIGN2,
+	[AVT_ID] AS AVT_ID,
+	[BESTUT_V] AS BESTUT_V,
+	[BUDGET_V] AS BUDGET_V,
+	[BUDV2_V] AS BUDV2_V,
+	[DATUM_ID] AS DATUM_ID,
+	COALESCE([DEFDATUM], '1899-12-31 00:00:00') AS DEFDATUM,
+	[DEFSIGN] AS DEFSIGN,
+	[DOK_ANTAL] AS DOK_ANTAL,
+	[DOKTYP] AS DOKTYP,
+	[DOKUMENTID] AS DOKUMENTID,
+	[ERS_ID] AS ERS_ID,
+	[EXTERNANM] AS EXTERNANM,
+	[EXTERNID] AS EXTERNID,
+	[EXTERNNR] AS EXTERNNR,
+	[FORETAG] AS FORETAG,
+	[FÖPROC_ID] AS FÖPROC_ID,
+	[FÖRBEL_V] AS FÖRBEL_V,
+	[HUVUDTEXT] AS HUVUDTEXT,
+	[HÄND_ID] AS HÄND_ID,
+	[IB] AS IB,
+	[IMOT_ID] AS IMOT_ID,
+	[INTERNVERNR] AS INTERNVERNR,
+	[KASSA_ID] AS KASSA_ID,
+	[KATEGORI] AS KATEGORI,
+	[KONTO_ID] AS KONTO_ID,
+	[KONTSIGN] AS KONTSIGN,
+	[KST_ID] AS KST_ID,
+	[MED] AS MED,
+	[MOTP_ID] AS MOTP_ID,
+	[ORGVAL_V] AS ORGVAL_V,
+	[PNYCKEL] AS PNYCKEL,
+	[PROG_V] AS PROG_V,
+	[PROR12_V] AS PROR12_V,
+	[RADTEXT] AS RADTEXT,
+	[RADTYPNR] AS RADTYPNR,
+	[REGDAT_ID] AS REGDAT_ID,
+	COALESCE([REGDATUM], '1899-12-31 00:00:00') AS REGDATUM,
+	[REGSIGN] AS REGSIGN,
+	[SID_ID] AS SID_ID,
+	[STATUS] AS STATUS,
+	[TRID_ID] AS TRID_ID,
+	[URSPRUNGS_VERIFIKAT] AS URSPRUNGS_VERIFIKAT,
+	[URSPTEXT] AS URSPTEXT,
+	[UTFALL_V] AS UTFALL_V,
+	[UTFUTL_V] AS UTFUTL_V,
+	[UTILITY] AS UTILITY,
+	[VAL_ID] AS VAL_ID,
+	COALESCE([VERDATUM], '1899-12-31 00:00:00') AS VERDATUM,
+	[VERDOKREF] AS VERDOKREF,
+	[VERNR] AS VERNR,
+	[VERRAD] AS VERRAD,
+	[VERTYP] AS VERTYP,
+	[YRK_ID] AS YRK_ID
+    FROM [udpb4].[udpb4_100].[EK_FAKTA_VERIFIKAT]
+    WHERE CAST(VERDATUM AS DATE) BETWEEN '{since}' AND '{until}'
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_1100", query, batch_size=500_000):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn, since=since, until=until)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

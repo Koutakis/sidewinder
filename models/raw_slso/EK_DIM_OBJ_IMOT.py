@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_dim_obj_imot",
@@ -30,22 +32,36 @@ config = Model(
     tags=['slso', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	COALESCE([IMOT_GILTIG_FOM], '1899-12-31 00:00:00') AS IMOT_GILTIG_FOM,
-    	COALESCE([IMOT_GILTIG_TOM], '1899-12-31 00:00:00') AS IMOT_GILTIG_TOM,
-    	[IMOT_ID] AS IMOT_ID,
-    	[IMOT_ID_TEXT] AS IMOT_ID_TEXT,
-    	[IMOT_PASSIV] AS IMOT_PASSIV,
-    	[IMOT_TEXT] AS IMOT_TEXT,
-    	COALESCE([REIMOT_GILTIG_FOM], '1899-12-31 00:00:00') AS REIMOT_GILTIG_FOM,
-    	COALESCE([REIMOT_GILTIG_TOM], '1899-12-31 00:00:00') AS REIMOT_GILTIG_TOM,
-    	[REIMOT_ID] AS REIMOT_ID,
-    	[REIMOT_ID_TEXT] AS REIMOT_ID_TEXT,
-    	[REIMOT_PASSIV] AS REIMOT_PASSIV,
-    	[REIMOT_TEXT] AS REIMOT_TEXT
-    FROM [udpb4].[udpb4_100].[EK_DIM_OBJ_IMOT]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_1100')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	COALESCE([IMOT_GILTIG_FOM], '1899-12-31 00:00:00') AS IMOT_GILTIG_FOM,
+	COALESCE([IMOT_GILTIG_TOM], '1899-12-31 00:00:00') AS IMOT_GILTIG_TOM,
+	[IMOT_ID] AS IMOT_ID,
+	[IMOT_ID_TEXT] AS IMOT_ID_TEXT,
+	[IMOT_PASSIV] AS IMOT_PASSIV,
+	[IMOT_TEXT] AS IMOT_TEXT,
+	COALESCE([REIMOT_GILTIG_FOM], '1899-12-31 00:00:00') AS REIMOT_GILTIG_FOM,
+	COALESCE([REIMOT_GILTIG_TOM], '1899-12-31 00:00:00') AS REIMOT_GILTIG_TOM,
+	[REIMOT_ID] AS REIMOT_ID,
+	[REIMOT_ID_TEXT] AS REIMOT_ID_TEXT,
+	[REIMOT_PASSIV] AS REIMOT_PASSIV,
+	[REIMOT_TEXT] AS REIMOT_TEXT
+    FROM [udpb4].[udpb4_100].[EK_DIM_OBJ_IMOT]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_1100", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")

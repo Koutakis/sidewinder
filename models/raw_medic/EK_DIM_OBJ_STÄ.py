@@ -1,7 +1,9 @@
 from bollhav import Model, WriteMode
 from bollhav.postgres import PostgresColumn, PostgresType
 from bollhav.database import Database
-from core import read
+from core import read, write
+from roskarl.marshal import with_env_config, EnvConfig
+from roskarl import env_var_dsn
 
 config = Model(
     name="ek_dim_obj_stä",
@@ -36,28 +38,42 @@ config = Model(
     tags=['medic', 'raindance', 'raw'],
 )
 
-def execute(env, cfg=config):
-    query=f"""SELECT * FROM (SELECT
-    	CAST(GETDATE() AS DATE) as _data_modified,
-    	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
-    	COALESCE([AVD_GILTIG_FOM], '1899-12-31 00:00:00') AS AVD_GILTIG_FOM,
-    	COALESCE([AVD_GILTIG_TOM], '1899-12-31 00:00:00') AS AVD_GILTIG_TOM,
-    	[AVD_ID] AS AVD_ID,
-    	[AVD_ID_TEXT] AS AVD_ID_TEXT,
-    	[AVD_PASSIV] AS AVD_PASSIV,
-    	[AVD_TEXT] AS AVD_TEXT,
-    	COALESCE([RE_GILTIG_FOM], '1899-12-31 00:00:00') AS RE_GILTIG_FOM,
-    	COALESCE([RE_GILTIG_TOM], '1899-12-31 00:00:00') AS RE_GILTIG_TOM,
-    	[RE_ID] AS RE_ID,
-    	[RE_ID_TEXT] AS RE_ID_TEXT,
-    	[RE_PASSIV] AS RE_PASSIV,
-    	[RE_TEXT] AS RE_TEXT,
-    	COALESCE([STÄ_GILTIG_FOM], '1899-12-31 00:00:00') AS STÄ_GILTIG_FOM,
-    	COALESCE([STÄ_GILTIG_TOM], '1899-12-31 00:00:00') AS STÄ_GILTIG_TOM,
-    	[STÄ_ID] AS STÄ_ID,
-    	[STÄ_ID_TEXT] AS STÄ_ID_TEXT,
-    	[STÄ_PASSIV] AS STÄ_PASSIV,
-    	[STÄ_TEXT] AS STÄ_TEXT
-    FROM [MediCarrierUDP].[utdata100].[EK_DIM_OBJ_STÄ]) y
-    WHERE 1=1"""
-    yield from read(query=query, env_var_name='RAINDANCE_8090')
+@with_env_config
+def execute(env: EnvConfig, cfg=config):
+    dest_dsn = env_var_dsn("BIG_EKONOMI_EXECUTION_PROD")
+    query = """
+    SELECT
+	CAST(GETDATE() AS DATE) as _data_modified,
+	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
+	COALESCE([AVD_GILTIG_FOM], '1899-12-31 00:00:00') AS AVD_GILTIG_FOM,
+	COALESCE([AVD_GILTIG_TOM], '1899-12-31 00:00:00') AS AVD_GILTIG_TOM,
+	[AVD_ID] AS AVD_ID,
+	[AVD_ID_TEXT] AS AVD_ID_TEXT,
+	[AVD_PASSIV] AS AVD_PASSIV,
+	[AVD_TEXT] AS AVD_TEXT,
+	COALESCE([RE_GILTIG_FOM], '1899-12-31 00:00:00') AS RE_GILTIG_FOM,
+	COALESCE([RE_GILTIG_TOM], '1899-12-31 00:00:00') AS RE_GILTIG_TOM,
+	[RE_ID] AS RE_ID,
+	[RE_ID_TEXT] AS RE_ID_TEXT,
+	[RE_PASSIV] AS RE_PASSIV,
+	[RE_TEXT] AS RE_TEXT,
+	COALESCE([STÄ_GILTIG_FOM], '1899-12-31 00:00:00') AS STÄ_GILTIG_FOM,
+	COALESCE([STÄ_GILTIG_TOM], '1899-12-31 00:00:00') AS STÄ_GILTIG_TOM,
+	[STÄ_ID] AS STÄ_ID,
+	[STÄ_ID_TEXT] AS STÄ_ID_TEXT,
+	[STÄ_PASSIV] AS STÄ_PASSIV,
+	[STÄ_TEXT] AS STÄ_TEXT
+    FROM [MediCarrierUDP].[utdata100].[EK_DIM_OBJ_STÄ]
+
+    """
+    total_rows = 0
+    first_batch = True
+    for df in read("RAINDANCE_8090", query):
+        if len(df) == 0:
+            continue
+        write(cfg, df, dest_dsn)
+        if first_batch:
+            cfg.write_mode = WriteMode.APPEND
+            first_batch = False
+        total_rows += len(df)
+    print(f"  ✓ {cfg.name}: {total_rows:,} rows written" if total_rows else f"  ⏭ {cfg.name}: no data, skipping")
