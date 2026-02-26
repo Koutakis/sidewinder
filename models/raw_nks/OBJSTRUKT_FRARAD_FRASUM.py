@@ -7,7 +7,7 @@ config = Model(
     name="objstrukt_frarad_frasum",
     source_entity="OBJSTRUKT_FRARAD_FRASUM",
     table="objstrukt_frarad_frasum",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

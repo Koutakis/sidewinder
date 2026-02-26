@@ -32,6 +32,19 @@ def main(env: EnvConfig):
     if not dest_dsn:
         exit_with_error("DEST_ENV not set")
 
+    # Filter by tags
+    if env.tags:
+        filtered = {}
+        for name, import_path in available.items():
+            module = importlib.import_module(import_path)
+            if any(t in module.config.tags for t in env.tags):
+                filtered[name] = import_path
+        available = filtered
+
+    # Filter by model names
+    if env.models:
+        available = {k: v for k, v in available.items() if k in env.models}
+
     print_model_list(available)
 
     successes = 0

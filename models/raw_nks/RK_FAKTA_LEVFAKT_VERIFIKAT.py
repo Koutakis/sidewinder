@@ -7,8 +7,8 @@ config = Model(
     name="rk_fakta_levfakt_verifikat",
     source_entity="RK_FAKTA_LEVFAKT_VERIFIKAT",
     table="rk_fakta_levfakt_verifikat",
-    schema="raindance_raw_nks",
-    write_mode=WriteMode.TRUNCATE_INSERT,
+    schema="raindance_raw_2710",
+    write_mode=WriteMode.MERGE,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),
         PostgresColumn(name="_metadata_modified", data_type=PostgresType.TIMESTAMPTZ),
@@ -111,6 +111,15 @@ config = Model(
 )
 
 def execute(env, cfg=config):
+    if env.backfill and env.backfill.enabled:
+        since = env.backfill.since.strftime("%Y-%m-%d")
+        until = env.backfill.until.strftime("%Y-%m-%d")
+    elif env.cron and env.cron.enabled:
+        since = env.cron.since.strftime("%Y-%m-%d")
+        until = env.cron.until.strftime("%Y-%m-%d")
+    else:
+        since = None
+        until = None
     query=f"""SELECT * FROM (SELECT
     	CAST(VERDATUM AS DATE) as _data_modified,
     	CAST(GETDATE() AS DATETIME2) as _metadata_modified,
@@ -207,5 +216,5 @@ def execute(env, cfg=config):
     	[VERTYP] AS VERTYP,
     	[VREF] AS VREF
     FROM [raindance_udp].[udp_100].[RK_FAKTA_LEVFAKT_VERIFIKAT]) y
-    WHERE CAST(_data_modified AS DATE) = CAST('{start}' AS DATE)"""
+    WHERE _data_modified BETWEEN '{since}' AND '{until}'"""
     yield from read(query=query, env_var_name='RAINDANCE_2710')

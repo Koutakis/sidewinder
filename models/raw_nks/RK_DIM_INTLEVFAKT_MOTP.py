@@ -7,7 +7,7 @@ config = Model(
     name="rk_dim_intlevfakt_motp",
     source_entity="RK_DIM_INTLEVFAKT_MOTP",
     table="rk_dim_intlevfakt_motp",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

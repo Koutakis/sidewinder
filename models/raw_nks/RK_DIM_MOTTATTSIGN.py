@@ -7,7 +7,7 @@ config = Model(
     name="rk_dim_mottattsign",
     source_entity="RK_DIM_MOTTATTSIGN",
     table="rk_dim_mottattsign",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

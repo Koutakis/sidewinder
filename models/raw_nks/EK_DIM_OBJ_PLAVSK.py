@@ -7,7 +7,7 @@ config = Model(
     name="ek_dim_obj_plavsk",
     source_entity="EK_DIM_OBJ_PLAVSK",
     table="ek_dim_obj_plavsk",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

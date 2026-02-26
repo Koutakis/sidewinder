@@ -7,7 +7,7 @@ config = Model(
     name="obj_tschem",
     source_entity="OBJ_TSCHEM",
     table="obj_tschem",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

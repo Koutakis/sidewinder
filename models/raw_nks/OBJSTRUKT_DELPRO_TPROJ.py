@@ -7,7 +7,7 @@ config = Model(
     name="objstrukt_delpro_tproj",
     source_entity="OBJSTRUKT_DELPRO_TPROJ",
     table="objstrukt_delpro_tproj",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

@@ -7,7 +7,7 @@ config = Model(
     name="ar_dim_status",
     source_entity="AR_DIM_STATUS",
     table="ar_dim_status",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

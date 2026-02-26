@@ -7,7 +7,7 @@ config = Model(
     name="rk_dim_tab_rdeb",
     source_entity="RK_DIM_TAB_RDEB",
     table="rk_dim_tab_rdeb",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

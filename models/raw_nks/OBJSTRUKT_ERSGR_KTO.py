@@ -7,7 +7,7 @@ config = Model(
     name="objstrukt_ersgr_kto",
     source_entity="OBJSTRUKT_ERSGR_KTO",
     table="objstrukt_ersgr_kto",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),

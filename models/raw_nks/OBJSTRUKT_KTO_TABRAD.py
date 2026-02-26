@@ -7,7 +7,7 @@ config = Model(
     name="objstrukt_kto_tabrad",
     source_entity="OBJSTRUKT_KTO_TABRAD",
     table="objstrukt_kto_tabrad",
-    schema="raindance_raw_nks",
+    schema="raindance_raw_2710",
     write_mode=WriteMode.TRUNCATE_INSERT,
     columns=[
         PostgresColumn(name="_data_modified", data_type=PostgresType.DATE),
